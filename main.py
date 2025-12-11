@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-# === MQ ATMOS LAB: BELLATOR V16.2 (THE PERFECTED ONE) ===
-# FEATURES: Humidity Patch + Forecast (+3h/+6h) + Snow Protocol + GitHub Secrets.
-# ENTORNO: 100% Automático para GitHub Actions.
+# === MQ ATMOS LAB: BELLATOR V16.3 (TACTICAL TEXT FIX) ===
+# SOLUCIÓN: Reemplazo de Emojis por TEXTO TÁCTICO para evitar error de fuentes en Linux.
+# ESTÉTICA: Panel de control militar (Sin iconos de colores).
 
 import gpxpy
 import gpxpy.gpx
@@ -14,7 +14,7 @@ import ftplib
 import folium
 
 # 1. CONFIGURACIÓN
-print("📡 INICIANDO SISTEMA V16.2 (FULL FEATURE)...")
+print("📡 INICIANDO SISTEMA V16.3 (TACTICAL TEXT)...")
 OUTPUT_FOLDER = 'output/'
 if not os.path.exists(OUTPUT_FOLDER): os.makedirs(OUTPUT_FOLDER)
 GPX_FILE = 'MQ_TRACK.gpx' 
@@ -42,83 +42,65 @@ sectors = [
     {"id":6,"name":"SRA. GRAÇA","lat":41.4168,"lon":-7.9106,"alt":"950m","altitude_m":950,"type":"CLIMB","desc":"THE CLIMB"}
 ]
 
-# 4. LÓGICA METEO (CON PARCHE HUMEDAD + NIEVE)
-def get_weather_icon(code):
-    if code == 0: return "☀️"
-    if 1 <= code <= 3: return "☁️"
-    if code in [45, 48]: return "🌫️"
-    if 51 <= code <= 67: return "🌧️"
-    if code in [71,73,75,77,85,86]: return "❄️"
-    if 80 <= code <= 82: return "⛈️"
-    if 95 <= code <= 99: return "⚡"
-    return "☁️"
-
-def get_weather_word(code):
-    if code == 0: return "SUNNY"
-    if 1 <= code <= 3: return "CLOUDS"
-    if code in [45, 48]: return "FOG"
-    if 51 <= code <= 67: return "RAIN"
-    if code in [71,73,75,77,85,86]: return "SNOW"
-    if 80 <= code <= 82: return "STORM"
-    if 95 <= code <= 99: return "THUNDER"
-    return "CLOUDY"
+# 4. LÓGICA METEO (TEXTO EN LUGAR DE ICONOS)
+def get_weather_text(code):
+    if code == 0: return "CLEAR"      # Antes ☀️
+    if 1 <= code <= 3: return "CLOUDY"   # Antes ☁️
+    if code in [45, 48]: return "FOG"    # Antes 🌫️
+    if 51 <= code <= 67: return "RAIN"   # Antes 🌧️
+    if code in [71,73,75,77,85,86]: return "SNOW" # Antes ❄️
+    if 80 <= code <= 82: return "STORM"  # Antes ⛈️
+    if 95 <= code <= 99: return "THUNDER" # Antes ⚡
+    return "OVCAST" # Overcast
 
 def calculate_mq_rsi(temp, wind, humidity, altitude, rain, gtype, code):
-    # 1. Base RSI
     veff = wind + (35.0 if gtype == "DESCEND" else 15.0)
     rsi = temp - (0.25 * (veff**0.684) * ((34.8 - temp)**0.31))
-    
-    # 2. Penalización Lluvia
     if rain > 0.5: rsi -= 6.0
+    if temp > 25: rsi += (humidity / 100) * 5.0 # Parche Humedad
 
-    # 3. HUMIDITY PATCH (Tu idea)
-    # Si hace calor (>25C), la humedad suma estrés
-    if temp > 25:
-        rsi += (humidity / 100) * 5.0
-
-    # 4. Estados
     status, color, msg = "STABLE", "#2ecc71", "CONDITIONS OK"
     if rsi < 5: status, color, msg = "COLD ALERT", "#f1c40f", "LOW TEMP RISK"
     if rsi < 0: status, color, msg = "HYPOTHERMIA", "#e74c3c", "EXTREME COLD"
     if rsi > 35: status, color, msg = "HEAT WARNING", "#e67e22", "HEAT RISK"
 
-    # 5. OVERRIDE NIEVE (Gronko Fix)
     is_snow = False
     if code in [71, 73, 75, 77, 85, 86]:
         is_snow = True
         status = "SNOW ALERT"; color = "#e67e22"; msg = "ICE/SNOW ON TRACK"
         if code in [75, 86]: status = "BLIZZARD"; color = "#e74c3c"; msg = "EXTREME CAUTION"
 
-    # Retornamos 5 valores (Fix crítico)
     return int(rsi), status, color, msg, is_snow
 
-# 5. GENERADOR TARJETAS (CON PREVISIÓN)
+# 5. GENERADOR TARJETAS (TEXTO TÁCTICO)
 def generate_ui_card(sector, data_now, data_3h, data_6h):
-    # Calculamos Actual
     rsi, status, color, msg, is_snow = calculate_mq_rsi(data_now['temp'], data_now['wind'], data_now['hum'], sector['altitude_m'], data_now['rain'], sector['type'], data_now['code'])
     
-    # Calculamos Futuro (Solo RSI para tendencia)
     rsi_3h, _, _, _, _ = calculate_mq_rsi(data_3h['temp'], data_3h['wind'], data_3h['hum'], sector['altitude_m'], data_3h['rain'], sector['type'], data_3h['code'])
     rsi_6h, _, _, _, _ = calculate_mq_rsi(data_6h['temp'], data_6h['wind'], data_6h['hum'], sector['altitude_m'], data_6h['rain'], sector['type'], data_6h['code'])
     
+    # Flechas como texto simple (ASCII) que sí soporta Linux
     def get_arrow(curr, fut):
         diff = fut - curr
-        if diff < -2: return "📉"
-        if diff > 2: return "📈"
-        return "➡️"
+        if diff < -2: return "(-)" # Bajando
+        if diff > 2: return "(+)" # Subiendo
+        return "(=)" # Igual
 
     arrow_3h = get_arrow(rsi, rsi_3h)
     arrow_6h = get_arrow(rsi, rsi_6h)
 
-    # Dibujamos
     fig, ax = plt.subplots(figsize=(6, 3.2), facecolor='#0f172a'); ax.set_facecolor='#0f172a'
     rect = patches.Rectangle((0, 0), 0.03, 1, transform=ax.transAxes, linewidth=0, facecolor=color); ax.add_patch(rect)
 
     plt.text(0.08, 0.78, sector['name'], color='white', fontsize=16, fontweight='bold', transform=ax.transAxes)
     plt.text(0.08, 0.65, f"{sector['desc']} | {sector['alt']}", color='#94a3b8', fontsize=8, fontweight='bold', transform=ax.transAxes)
 
-    if is_snow: plt.text(0.5, 0.25, "SNOW", color='white', alpha=0.10, fontsize=55, fontweight='bold', ha='center', transform=ax.transAxes)
-    else: plt.text(0.08, 0.30, get_weather_word(data_now['code']), color='white', alpha=0.08, fontsize=35, fontweight='bold', transform=ax.transAxes)
+    # AQUÍ ESTÁ EL CAMBIO: TEXTO EN VEZ DE ICONO, TAMAÑO AJUSTADO
+    if is_snow: 
+        plt.text(0.5, 0.35, "SNOW", color='white', alpha=0.10, fontsize=55, fontweight='bold', ha='center', transform=ax.transAxes)
+    else: 
+        # Texto de clima (RAIN, CLEAR...) más pequeño que el icono para que quepa
+        plt.text(0.08, 0.35, get_weather_text(data_now['code']), color='white', alpha=0.10, fontsize=40, fontweight='bold', transform=ax.transAxes)
 
     plt.text(0.92, 0.65, f"{int(data_now['temp'])}°", color='white', fontsize=38, fontweight='bold', ha='right', transform=ax.transAxes)
     rsi_col = "#38bdf8" if rsi < data_now['temp'] else "#fca5a5"
@@ -128,17 +110,18 @@ def generate_ui_card(sector, data_now, data_3h, data_6h):
     bbox = dict(boxstyle="round,pad=0.4", fc=color, ec="none", alpha=0.2)
     plt.text(0.92, 0.22, f" {status} ", color=color, fontsize=9, ha='right', fontweight='bold', bbox=bbox, transform=ax.transAxes)
 
-    # Footer Previsión
+    # Footer Previsión (Texto limpio)
     plt.plot([0.05, 0.95], [0.15, 0.15], color='#334155', linewidth=1, transform=ax.transAxes)
-    f_3h = f"+3H: {get_weather_icon(data_3h['code'])} {int(data_3h['temp'])}° {arrow_3h}"
-    f_6h = f"+6H: {get_weather_icon(data_6h['code'])} {int(data_6h['temp'])}° {arrow_6h}"
-    plt.text(0.05, 0.04, f_3h, color='#94a3b8', fontsize=10, fontweight='bold', ha='left', transform=ax.transAxes)
-    plt.text(0.95, 0.04, f_6h, color='#94a3b8', fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
+    # Ej: +3H: RAIN 12° (-)
+    f_3h = f"+3H: {get_weather_text(data_3h['code'])} {int(data_3h['temp'])}° {arrow_3h}"
+    f_6h = f"+6H: {get_weather_text(data_6h['code'])} {int(data_6h['temp'])}° {arrow_6h}"
+    plt.text(0.05, 0.04, f_3h, color='#94a3b8', fontsize=9, fontweight='bold', ha='left', transform=ax.transAxes)
+    plt.text(0.95, 0.04, f_6h, color='#94a3b8', fontsize=9, fontweight='bold', ha='right', transform=ax.transAxes)
 
     ax.axis('off'); plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png", dpi=150, bbox_inches='tight', facecolor='#0f172a', pad_inches=0.1); plt.close()
     return status, rsi, data_now['wind']
 
-# 6. BANNER DASHBOARD (CLEAN LAYOUT)
+# 6. BANNER DASHBOARD (SIN CAMBIOS VISUALES IMPORTANTES, SOLO DATOS)
 def generate_dashboard_banner(status, min_rsi, max_wind, worst_sector):
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a'); ax.set_facecolor='#0a0a0a'
     color = "#2ecc71"
@@ -146,7 +129,6 @@ def generate_dashboard_banner(status, min_rsi, max_wind, worst_sector):
     if "CRITICAL" in status or "BLIZZARD" in status: color = "#e74c3c"
     
     rect = patches.Rectangle((0, 0), 0.015, 1, transform=ax.transAxes, linewidth=0, facecolor=color); ax.add_patch(rect)
-    
     ax_radar = fig.add_axes([0.05, 0.15, 0.20, 0.70]); ax_radar.set_facecolor='#0a0a0a'
     lats = [p[0] for p in track_points]; lons = [p[1] for p in track_points]
     ax_radar.plot(lons, lats, color=color, linewidth=1.2, alpha=0.9)
@@ -222,12 +204,10 @@ generate_map()
 # === TRANSMISIÓN WEB SEGURA ===
 print("Subiendo a FTP...")
 FTP_HOST = "ftp.nexplore.pt"
-# LEEMOS SECRETOS (GitHub)
 if "FTP_USER" in os.environ:
     FTP_USER = os.environ["FTP_USER"]
     FTP_PASS = os.environ["FTP_PASS"]
 else:
-    # Fallback para pruebas locales si tienes .env (opcional)
     print("⚠️ No hay secretos. Modo prueba local.")
     FTP_USER = ""
     FTP_PASS = ""
@@ -245,3 +225,5 @@ if FTP_USER:
     upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
     upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html")
     for i in range(1, 7): upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png")
+
+print("✅ SISTEMA V16.3 COMPLETADO.")
