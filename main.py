@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-# === MQ ATMOS LAB: BELLATOR V16.5 (VISIBILITY PERFECTED) ===
-# MEJORAS: Margen inferior aumentado (0.25) y texto subido (0.09).
-# BASE: V16.4 + Humidity + Snow Fix + GitHub Secrets.
+# === MQ ATMOS LAB: BELLATOR V16.6 (NO CROP EDITION) ===
+# SOLUCIÓN DEFINITIVA AL CORTE DE TEXTO:
+# Se elimina 'bbox_inches=tight' y se fuerza un lienzo fijo.
+# El footer ya no puede ser recortado por el algoritmo automático.
 
 import gpxpy
 import gpxpy.gpx
@@ -13,7 +14,7 @@ import os
 import ftplib
 import folium
 
-print("📡 INICIANDO SISTEMA V16.5 (VISIBILITY PERFECTED)...")
+print("📡 INICIANDO SISTEMA V16.6 (NO-CROP FIX)...")
 OUTPUT_FOLDER = 'output/'
 if not os.path.exists(OUTPUT_FOLDER): os.makedirs(OUTPUT_FOLDER)
 GPX_FILE = 'MQ_TRACK.gpx' 
@@ -55,7 +56,7 @@ def calculate_mq_rsi(temp, wind, humidity, altitude, rain, gtype, code):
     veff = wind + (35.0 if gtype == "DESCEND" else 15.0)
     rsi = temp - (0.25 * (veff**0.684) * ((34.8 - temp)**0.31))
     if rain > 0.5: rsi -= 6.0
-    if temp > 25: rsi += (humidity / 100) * 5.0 # Humidity Patch
+    if temp > 25: rsi += (humidity / 100) * 5.0 
 
     status, color, msg = "STABLE", "#2ecc71", "CONDITIONS OK"
     if rsi < 5: status, color, msg = "COLD ALERT", "#f1c40f", "LOW TEMP RISK"
@@ -69,7 +70,7 @@ def calculate_mq_rsi(temp, wind, humidity, altitude, rain, gtype, code):
         if code in [75, 86]: status = "BLIZZARD"; color = "#e74c3c"; msg = "EXTREME CAUTION"
     return int(rsi), status, color, msg, is_snow
 
-# 4. TARJETAS (VISIBILIDAD CORREGIDA)
+# 4. TARJETAS (LIENZO FIJO - SIN RECORTE)
 def generate_ui_card(sector, data_now, data_3h, data_6h):
     rsi, status, color, msg, is_snow = calculate_mq_rsi(data_now['temp'], data_now['wind'], data_now['hum'], sector['altitude_m'], data_now['rain'], sector['type'], data_now['code'])
     rsi_3h, _, _, _, _ = calculate_mq_rsi(data_3h['temp'], data_3h['wind'], data_3h['hum'], sector['altitude_m'], data_3h['rain'], sector['type'], data_3h['code'])
@@ -80,47 +81,58 @@ def generate_ui_card(sector, data_now, data_3h, data_6h):
         if diff < -2: return "(-)" 
         if diff > 2: return "(+)" 
         return "(=)" 
-
     arrow_3h = get_arrow(rsi, rsi_3h)
     arrow_6h = get_arrow(rsi, rsi_6h)
 
-    fig, ax = plt.subplots(figsize=(6, 3.2), facecolor='#0f172a'); ax.set_facecolor='#0f172a'
+    # Aumentamos un poco la altura (3.4) para asegurar espacio
+    fig, ax = plt.subplots(figsize=(6, 3.4), facecolor='#0f172a'); ax.set_facecolor='#0f172a'
+    
+    # ESTO ES LA CLAVE: Ajustar márgenes a 0 para usar todo el espacio
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
     rect = patches.Rectangle((0, 0), 0.03, 1, transform=ax.transAxes, linewidth=0, facecolor=color); ax.add_patch(rect)
 
-    plt.text(0.08, 0.78, sector['name'], color='white', fontsize=16, fontweight='bold', transform=ax.transAxes)
-    plt.text(0.08, 0.65, f"{sector['desc']} | {sector['alt']}", color='#94a3b8', fontsize=8, fontweight='bold', transform=ax.transAxes)
+    # Elementos subidos ligeramente
+    plt.text(0.08, 0.80, sector['name'], color='white', fontsize=16, fontweight='bold', transform=ax.transAxes)
+    plt.text(0.08, 0.68, f"{sector['desc']} | {sector['alt']}", color='#94a3b8', fontsize=8, fontweight='bold', transform=ax.transAxes)
 
-    if is_snow: plt.text(0.5, 0.35, "SNOW", color='white', alpha=0.10, fontsize=55, fontweight='bold', ha='center', transform=ax.transAxes)
-    else: plt.text(0.08, 0.35, get_weather_text(data_now['code']), color='white', alpha=0.10, fontsize=40, fontweight='bold', transform=ax.transAxes)
+    if is_snow: plt.text(0.5, 0.40, "SNOW", color='white', alpha=0.10, fontsize=55, fontweight='bold', ha='center', transform=ax.transAxes)
+    else: plt.text(0.08, 0.40, get_weather_text(data_now['code']), color='white', alpha=0.10, fontsize=40, fontweight='bold', transform=ax.transAxes)
 
-    plt.text(0.92, 0.65, f"{int(data_now['temp'])}°", color='white', fontsize=38, fontweight='bold', ha='right', transform=ax.transAxes)
+    plt.text(0.92, 0.68, f"{int(data_now['temp'])}°", color='white', fontsize=38, fontweight='bold', ha='right', transform=ax.transAxes)
     rsi_col = "#38bdf8" if rsi < data_now['temp'] else "#fca5a5"
-    plt.text(0.92, 0.52, f"MQ RSI: {rsi}°", color=rsi_col, fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
-    plt.text(0.92, 0.42, f"WIND {int(data_now['wind'])} km/h", color='#94a3b8', fontsize=7, ha='right', transform=ax.transAxes)
+    plt.text(0.92, 0.55, f"MQ RSI: {rsi}°", color=rsi_col, fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
+    plt.text(0.92, 0.45, f"WIND {int(data_now['wind'])} km/h", color='#94a3b8', fontsize=7, ha='right', transform=ax.transAxes)
 
     bbox = dict(boxstyle="round,pad=0.4", fc=color, ec="none", alpha=0.2)
-    plt.text(0.92, 0.22, f" {status} ", color=color, fontsize=9, ha='right', fontweight='bold', bbox=bbox, transform=ax.transAxes)
+    plt.text(0.92, 0.25, f" {status} ", color=color, fontsize=9, ha='right', fontweight='bold', bbox=bbox, transform=ax.transAxes)
 
-    # === ZONA DE PREVISIÓN (Ajuste Visual V16.5) ===
-    # Línea divisoria
-    plt.plot([0.05, 0.95], [0.18, 0.18], color='#334155', linewidth=1, transform=ax.transAxes)
+    # ZONA DE PREVISIÓN (Con espacio asegurado)
+    plt.plot([0.05, 0.95], [0.15, 0.15], color='#334155', linewidth=1, transform=ax.transAxes)
     
-    # Texto subido a 0.09
     f_3h = f"+3H: {get_weather_text(data_3h['code'])} {int(data_3h['temp'])}° {arrow_3h}"
     f_6h = f"+6H: {get_weather_text(data_6h['code'])} {int(data_6h['temp'])}° {arrow_6h}"
-    plt.text(0.05, 0.09, f_3h, color='#94a3b8', fontsize=9, fontweight='bold', ha='left', transform=ax.transAxes)
-    plt.text(0.95, 0.09, f_6h, color='#94a3b8', fontsize=9, fontweight='bold', ha='right', transform=ax.transAxes)
+    
+    # Texto en posición segura (0.06)
+    plt.text(0.05, 0.06, f_3h, color='#94a3b8', fontsize=9, fontweight='bold', ha='left', transform=ax.transAxes)
+    plt.text(0.95, 0.06, f_6h, color='#94a3b8', fontsize=9, fontweight='bold', ha='right', transform=ax.transAxes)
 
-    # Padding aumentado a 0.25
-    ax.axis('off'); plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png", dpi=150, bbox_inches='tight', facecolor='#0f172a', pad_inches=0.25); plt.close()
+    # GUARDADO SIN RECORTE AUTOMÁTICO
+    ax.axis('off')
+    # Eliminamos bbox_inches='tight' y pad_inches. Se guarda el lienzo exacto.
+    plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png", dpi=150, facecolor='#0f172a')
+    plt.close()
     return status, rsi, data_now['wind']
 
-# 5. BANNER DASHBOARD
+# 5. BANNER DASHBOARD (SIN CAMBIOS)
 def generate_dashboard_banner(status, min_rsi, max_wind, worst_sector):
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a'); ax.set_facecolor='#0a0a0a'
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0) # Lienzo completo
+    
     color = "#2ecc71"
     if "ALERT" in status or "SNOW" in status: color = "#e67e22"
     if "CRITICAL" in status or "BLIZZARD" in status: color = "#e74c3c"
+    
     rect = patches.Rectangle((0, 0), 0.015, 1, transform=ax.transAxes, linewidth=0, facecolor=color); ax.add_patch(rect)
     ax_radar = fig.add_axes([0.05, 0.15, 0.20, 0.70]); ax_radar.set_facecolor='#0a0a0a'
     lats = [p[0] for p in track_points]; lons = [p[1] for p in track_points]
@@ -134,6 +146,7 @@ def generate_dashboard_banner(status, min_rsi, max_wind, worst_sector):
     plt.text(0.28, 0.50, hook, color=color, fontsize=10, fontweight='bold', transform=ax.transAxes)
     plt.text(0.28, 0.35, sub, color='#888', fontsize=8, transform=ax.transAxes)
     plt.plot([0.68, 0.68], [0.2, 0.8], color='#222', linewidth=1, transform=ax.transAxes)
+    
     plt.text(0.76, 0.70, "MIN RSI", color='#666', fontsize=7, ha='center', transform=ax.transAxes)
     rsi_c = "#38bdf8" if min_rsi < 10 else "white"
     plt.text(0.76, 0.45, f"{min_rsi}°", color=rsi_c, fontsize=20, fontweight='bold', ha='center', transform=ax.transAxes)
@@ -141,9 +154,10 @@ def generate_dashboard_banner(status, min_rsi, max_wind, worst_sector):
     wind_c = "#e67e22" if max_wind > 30 else "white"
     plt.text(0.90, 0.45, f"{int(max_wind)}", color=wind_c, fontsize=20, fontweight='bold', ha='center', transform=ax.transAxes)
     plt.text(0.90, 0.32, "km/h", color='#666', fontsize=7, ha='center', transform=ax.transAxes)
+    
     bbox_btn = dict(boxstyle="round,pad=0.3", fc="#111", ec="#333", alpha=1.0)
     plt.text(0.96, 0.10, " ▶ ACCEDER A METEO STATION ", color='#aaa', fontsize=7, ha='right', bbox=bbox_btn, transform=ax.transAxes)
-    ax.axis('off'); plt.savefig(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", facecolor='#0a0a0a', dpi=150, bbox_inches='tight', pad_inches=0.0); plt.close()
+    ax.axis('off'); plt.savefig(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", facecolor='#0a0a0a', dpi=150); plt.close()
 
 # 6. MAPA TÁCTICO
 def generate_map():
@@ -202,6 +216,4 @@ if FTP_USER:
         except Exception as e: print(f"❌ ERROR FTP: {e}")
     upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
     upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html")
-    for i in range(1, 7): upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png")
-
-print("✅ SISTEMA V16.5 COMPLETADO.")
+    for i in range(1, 7): upload(f"{
