@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-# === MQ ATMOS LAB: BELLATOR V17.0 (TIMEKEEPER & PATHFINDER) ===
-# 1. TIMESTAMP: Añade hora de actualización en todas las imágenes.
-# 2. PATHFINDER: Intenta localizar la carpeta pública en el FTP.
-# 3. VISIBILITY: Mantiene el fix de márgenes para que se vea la previsión.
+# === MQ ATMOS LAB: BELLATOR V17.1 (THE FLASHLIGHT) ===
+# DIAGNÓSTICO: Lista el contenido de la carpeta donde aterriza.
+# FUNCIONALIDAD: Mantiene el Fix Visual V16.6 + Hora V17.0.
 
 import gpxpy
 import gpxpy.gpx
@@ -14,7 +13,7 @@ import os
 import ftplib
 import folium
 
-print("📡 INICIANDO SISTEMA V17.0 (TIMEKEEPER)...")
+print("📡 INICIANDO SISTEMA V17.1 (DIAGNOSTIC MODE)...")
 OUTPUT_FOLDER = 'output/'
 if not os.path.exists(OUTPUT_FOLDER): os.makedirs(OUTPUT_FOLDER)
 GPX_FILE = 'MQ_TRACK.gpx' 
@@ -41,15 +40,15 @@ sectors = [
     {"id":6,"name":"SRA. GRAÇA","lat":41.4168,"lon":-7.9106,"alt":"950m","altitude_m":950,"type":"CLIMB","desc":"THE CLIMB"}
 ]
 
-# 3. LÓGICA
+# 3. LÓGICA METEO
 def get_weather_text(code):
-    if code == 0: return "CLEAR"
-    if 1 <= code <= 3: return "CLOUDY"
-    if code in [45, 48]: return "FOG"
-    if 51 <= code <= 67: return "RAIN"
-    if code in [71,73,75,77,85,86]: return "SNOW"
-    if 80 <= code <= 82: return "STORM"
-    if 95 <= code <= 99: return "THUNDER"
+    if code == 0: return "CLEAR"; 
+    if 1 <= code <= 3: return "CLOUDY"; 
+    if code in [45, 48]: return "FOG"; 
+    if 51 <= code <= 67: return "RAIN"; 
+    if code in [71,73,75,77,85,86]: return "SNOW"; 
+    if 80 <= code <= 82: return "STORM"; 
+    if 95 <= code <= 99: return "THUNDER"; 
     return "OVCAST"
 
 def calculate_mq_rsi(temp, wind, humidity, altitude, rain, gtype, code):
@@ -67,7 +66,7 @@ def calculate_mq_rsi(temp, wind, humidity, altitude, rain, gtype, code):
         if code in [75, 86]: status = "BLIZZARD"; color = "#e74c3c"; msg = "EXTREME CAUTION"
     return int(rsi), status, color, msg, is_snow
 
-# 4. TARJETAS (CON HORA)
+# 4. TARJETAS (CON HORA Y MARGEN)
 def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     rsi, status, color, msg, is_snow = calculate_mq_rsi(data_now['temp'], data_now['wind'], data_now['hum'], sector['altitude_m'], data_now['rain'], sector['type'], data_now['code'])
     rsi_3h, _, _, _, _ = calculate_mq_rsi(data_3h['temp'], data_3h['wind'], data_3h['hum'], sector['altitude_m'], data_3h['rain'], sector['type'], data_3h['code'])
@@ -82,7 +81,6 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
 
     fig, ax = plt.subplots(figsize=(6, 3.4), facecolor='#0f172a'); ax.set_facecolor='#0f172a'
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    
     rect = patches.Rectangle((0, 0), 0.03, 1, transform=ax.transAxes, linewidth=0, facecolor=color); ax.add_patch(rect)
     plt.text(0.08, 0.80, sector['name'], color='white', fontsize=16, fontweight='bold', transform=ax.transAxes)
     plt.text(0.08, 0.68, f"{sector['desc']} | {sector['alt']}", color='#94a3b8', fontsize=8, fontweight='bold', transform=ax.transAxes)
@@ -95,14 +93,13 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.text(0.92, 0.55, f"MQ RSI: {rsi}°", color=rsi_col, fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
     plt.text(0.92, 0.45, f"WIND {int(data_now['wind'])} km/h", color='#94a3b8', fontsize=7, ha='right', transform=ax.transAxes)
     bbox = dict(boxstyle="round,pad=0.4", fc=color, ec="none", alpha=0.2); plt.text(0.92, 0.25, f" {status} ", color=color, fontsize=9, ha='right', fontweight='bold', bbox=bbox, transform=ax.transAxes)
-
     plt.plot([0.05, 0.95], [0.15, 0.15], color='#334155', linewidth=1, transform=ax.transAxes)
     f_3h = f"+3H: {get_weather_text(data_3h['code'])} {int(data_3h['temp'])}° {arrow_3h}"
     f_6h = f"+6H: {get_weather_text(data_6h['code'])} {int(data_6h['temp'])}° {arrow_6h}"
     plt.text(0.05, 0.09, f_3h, color='#94a3b8', fontsize=9, fontweight='bold', ha='left', transform=ax.transAxes)
     plt.text(0.95, 0.09, f_6h, color='#94a3b8', fontsize=9, fontweight='bold', ha='right', transform=ax.transAxes)
     
-    # TIMESTAMP (Nueva línea)
+    # TIMESTAMP
     plt.text(0.5, 0.02, f"UPDATED: {time_str} (UTC) | ECMWF", color='#475569', fontsize=6, ha='center', transform=ax.transAxes)
 
     ax.axis('off'); plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png", dpi=150, facecolor='#0f172a'); plt.close()
@@ -133,13 +130,23 @@ def generate_dashboard_banner(status, min_rsi, max_wind, worst_sector, time_str)
     bbox_btn = dict(boxstyle="round,pad=0.3", fc="#111", ec="#333", alpha=1.0); plt.text(0.96, 0.10, " ▶ ACCEDER A METEO STATION ", color='#aaa', fontsize=7, ha='right', bbox=bbox_btn, transform=ax.transAxes)
     ax.axis('off'); plt.savefig(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", facecolor='#0a0a0a', dpi=150); plt.close()
 
-# 6. EJECUCIÓN
+# 6. MAPA
+def generate_map():
+    print("🗺️ GENERANDO MAPA...")
+    center = track_points[len(track_points)//2] if len(track_points) > 10 else [41.30, -7.95]
+    m = folium.Map(location=center, zoom_start=10, tiles='CartoDB dark_matter')
+    folium.PolyLine(track_points, color="#00f2ff", weight=3, opacity=0.9, tooltip="MQ TRACK").add_to(m)
+    for s in sectors:
+        popup_c = f"<b>{s['name']}</b><br>Alt: {s['alt']}<br>Type: {s['type']}"
+        folium.CircleMarker([s['lat'], s['lon']], radius=6, color="#ff9900", fill=True, fill_color="#ff9900", fill_opacity=0.9, popup=popup_c, tooltip=s['name']).add_to(m)
+    m.save(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html")
+
+# === EJECUCIÓN ===
 print("🚀 OBTENIENDO DATOS ECMWF...")
 now = datetime.datetime.now()
 time_str = now.strftime("%H:%M")
 current_hour = now.hour
 worst_status = "STABLE"; worst_sector = ""; g_min_rsi = 99; g_max_wind = 0
-
 for sec in sectors:
     try:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance&forecast_days=2"
@@ -156,8 +163,8 @@ for sec in sectors:
 generate_dashboard_banner(worst_status, g_min_rsi, g_max_wind, worst_sector, time_str)
 generate_map()
 
-# === INVESTIGACIÓN FTP ===
-print("\n--- 🕵️‍♂️ INICIANDO SUBIDA FTP (PATHFINDER) ---")
+# === INVESTIGACIÓN FTP (LA LINTERNA) ===
+print("\n--- 🕵️‍♂️ INICIANDO INVESTIGACIÓN FTP ---")
 FTP_HOST = "ftp.nexplore.pt"
 if "FTP_USER" in os.environ:
     FTP_USER = os.environ["FTP_USER"]
@@ -165,41 +172,23 @@ if "FTP_USER" in os.environ:
     
     try:
         session = ftplib.FTP()
-        session.connect(FTP_HOST, 21)
-        session.login(FTP_USER, FTP_PASS)
-        session.set_pasv(True)
+        session.connect(FTP_HOST, 21); session.login(FTP_USER, FTP_PASS); session.set_pasv(True)
         
-        print(f"📍 RUTA INICIAL: {session.pwd()}")
+        # AQUÍ ESTÁ LA LINTERNA
+        print(f"📍 RUTA DONDE ATERRIZA EL ROBOT: {session.pwd()}")
+        print("📂 ¿QUÉ HAY AQUÍ?:")
+        files = session.nlst()
+        print(files)
         
-        # INTENTO DE CAMBIO DE CARPETA (CRÍTICO)
-        target_folder = "public_html" # Probamos la más común
-        try:
-            session.cwd(target_folder)
-            print(f"📂 CAMBIO A: {target_folder} EXITOSO.")
-        except:
-            print(f"⚠️ NO SE PUDO ENTRAR A '{target_folder}'. Probando raíz...")
-
-        # INTENTO DE CARPETA ATMOS
-        try:
-            session.cwd("atmos") # Si existe, entramos
-            print("📂 Entrando en carpeta 'atmos'...")
-        except:
-            print("ℹ️ Carpeta 'atmos' no existe o no accesible. Subiendo aquí mismo.")
-
-        print(f"📍 RUTA FINAL DE SUBIDA: {session.pwd()}")
-
+        # INTENTAMOS SUBIR DE TODAS FORMAS
         def upload(local, remote):
             with open(local, 'rb') as f: session.storbinary(f'STOR {remote}', f)
             print(f"🚀 SUBIDO: {remote}")
-            
         upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
         upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html")
         for i in range(1, 7): upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png")
         
         session.quit()
-        print("✅ PROCESO TERMINADO.")
-        
-    except Exception as e:
-        print(f"❌ ERROR CRÍTICO FTP: {e}")
-else:
-    print("⚠️ MODO LOCAL.")
+        print("✅ FIN DEL PROCESO.")
+    except Exception as e: print(f"❌ ERROR FTP: {e}")
+else: print("⚠️ MODO LOCAL")
