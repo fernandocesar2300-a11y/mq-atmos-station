@@ -157,7 +157,7 @@ class EEI_v31:
         elif EEI > 0:
             estado = {'nivel': 'DANGER', 'color': '#e74c3c'}
         else:
-            estado = {'nivel': 'CRITICAL', 'color': '#000000'}
+            estado = {'nivel': 'CRITICAL', 'color': '#8b0000'}
         
         componentes = {
             'T_wc': round(T_wc, 1),
@@ -307,18 +307,20 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.text(0.92, 0.68, f"{int(data_now['temp'])}°", color='white', 
             fontsize=38, fontweight='bold', ha='right', transform=ax.transAxes)
     
-    # EEI (reemplaza RSI)
-    eei_col = "#38bdf8" if eei_now < data_now['temp'] else "#fca5a5"
-    plt.text(0.92, 0.55, f"EEI v3.1: {int(eei_now)}°", color=eei_col, 
+    # MRI (MQ Rider Index)
+    mri_col = "#38bdf8" if eei_now < data_now['temp'] else "#fca5a5"
+    if status in ["CRITICAL", "DANGER"]:
+        mri_col = "#ffffff"  # Blanco para alertas críticas
+    plt.text(0.92, 0.55, f"MRI: {int(eei_now)}°", color=mri_col, 
             fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
     
     # Viento
     plt.text(0.92, 0.45, f"WIND {int(data_now['wind'])} km/h", 
             color='#94a3b8', fontsize=7, ha='right', transform=ax.transAxes)
     
-    # Status badge
-    bbox = dict(boxstyle="round,pad=0.4", fc=color, ec="none", alpha=0.2)
-    plt.text(0.92, 0.25, f" {status} ", color=color, fontsize=9, 
+    # Status badge (texto siempre blanco para máxima visibilidad)
+    bbox = dict(boxstyle="round,pad=0.4", fc=color, ec="none", alpha=0.9)
+    plt.text(0.92, 0.25, f" {status} ", color='white', fontsize=9, 
             ha='right', fontweight='bold', bbox=bbox, transform=ax.transAxes)
     
     # Separador
@@ -333,8 +335,8 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.text(0.95, 0.09, f_6h, color='#94a3b8', fontsize=9, 
             fontweight='bold', ha='right', transform=ax.transAxes)
     
-    # Timestamp + modelo
-    plt.text(0.5, 0.02, f"UPDATED: {time_str} (UTC) | EEI v3.1 (JAG/TI)", 
+    # Timestamp + branding
+    plt.text(0.5, 0.02, f"UPDATED: {time_str} (UTC) | MQ RIDER INDEX™ v3.1", 
             color='#475569', fontsize=6, ha='center', transform=ax.transAxes)
     
     ax.axis('off')
@@ -383,10 +385,10 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str)
     # Hook
     if color == "#2ecc71":
         hook = "ALL SECTORS: GREEN LIGHT"
-        sub = f"UPDATED: {time_str} UTC | EEI v3.1"
+        sub = f"UPDATED: {time_str} UTC | MQ RIDER INDEX™"
     else:
         hook = f"WARNING: {worst_sector}"
-        sub = f"UPDATED: {time_str} UTC | EEI v3.1"
+        sub = f"UPDATED: {time_str} UTC | MQ RIDER INDEX™"
     
     plt.text(0.28, 0.50, hook, color=color, fontsize=10, 
             fontweight='bold', transform=ax.transAxes)
@@ -395,8 +397,8 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str)
     # Separador
     plt.plot([0.68, 0.68], [0.2, 0.8], color='#222', linewidth=1, transform=ax.transAxes)
     
-    # MIN EEI
-    plt.text(0.76, 0.70, "MIN EEI", color='#666', fontsize=7, 
+    # MIN MRI
+    plt.text(0.76, 0.70, "MIN MRI", color='#666', fontsize=7, 
             ha='center', transform=ax.transAxes)
     eei_c = "#38bdf8" if min_eei < 10 else "white"
     plt.text(0.76, 0.45, f"{min_eei}°", color=eei_c, fontsize=20, 
@@ -489,7 +491,7 @@ for sec in sectors:
             worst_status = "ALERT"
             worst_sector = sec['name']
         
-        print(f"✅ {sec['name']:20} | EEI: {eei_val:3d}°C")
+        print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C")
         
     except Exception as e:
         print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
@@ -508,12 +510,12 @@ import json
 status_data = {
     "last_update": time_str,
     "alert_level": worst_status,
-    "min_eei": g_min_eei,
+    "min_mri": g_min_eei,
     "worst_sector": worst_sector if worst_sector else "ALL SECTORS",
     "status": worst_status,
     "max_wind": int(g_max_wind),
     "timestamp_utc": now.isoformat(),
-    "model_version": "EEI v3.1",
+    "model_version": "MQ Rider Index v3.1",
     "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"]
 }
 
@@ -577,13 +579,13 @@ else:
 print("\n" + "═"*70)
 print("🎯 BELLATOR V18.0 COMPLETADO")
 print("═"*70)
-print(f"📊 Modelo: EEI v3.1 (JAG/TI + Kinetic Vector)")
+print(f"📊 Modelo: MQ Rider Index v3.1 (JAG/TI adapted for MTB)")
 print(f"📅 Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-print(f"🌡️  MIN EEI: {g_min_eei}°C")
+print(f"🌡️  MIN MRI: {g_min_eei}°C")
 print(f"💨 MAX WIND: {int(g_max_wind)} km/h")
 print(f"⚠️  Status: {worst_status}")
 print("═"*70)
-print("\n✨ EEI v3.1 by Mountain Quest ATMOS LAB™")
-print("   Base: Osczevski & Bluestein (2001) - JAG/TI Standard")
-print("   GitHub: Actualiza con BELLATOR_V18_FINAL.py")
+print("\n✨ MQ RIDER INDEX™ v3.1 by Mountain Quest ATMOS LAB™")
+print("   Technical Base: Osczevski & Bluestein (2001) - JAG/TI Standard")
+print("   Proprietary Adaptation: Calibrated for ultra mountain biking")
 print("═"*70 + "\n")
