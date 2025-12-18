@@ -499,6 +499,32 @@ generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, tim
 generate_map()
 
 # ═══════════════════════════════════════════════════════════════════════════
+# GENERAR JSON DE ESTADO (PARA WIDGET)
+# ═══════════════════════════════════════════════════════════════════════════
+
+print("📊 GENERANDO JSON DE ESTADO...")
+import json
+
+status_data = {
+    "last_update": time_str,
+    "alert_level": worst_status,
+    "min_eei": g_min_eei,
+    "worst_sector": worst_sector if worst_sector else "ALL SECTORS",
+    "status": worst_status,
+    "max_wind": int(g_max_wind),
+    "timestamp_utc": now.isoformat(),
+    "model_version": "EEI v3.1",
+    "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"]
+}
+
+try:
+    with open(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json", 'w') as f:
+        json.dump(status_data, f, indent=2)
+    print("✅ JSON de estado generado")
+except Exception as e:
+    print(f"⚠️  Error generando JSON: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════
 # FTP UPLOAD
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -528,6 +554,8 @@ if "FTP_USER" in os.environ:
         upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
         upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", 
                "MQ_TACTICAL_MAP_CALIBRATED.html")
+        upload(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",
+               "MQ_ATMOS_STATUS.json")
         
         for i in range(1, 7):
             upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", 
