@@ -730,16 +730,16 @@ const MQ_Engine = {
         const defMsg = document.getElementById('r-defiance-msg');
 
         if(defScore < 30) {
-            defMsg.innerText = "Conservative plan. Safe margin.";
+            defMsg.innerText = "You shall not pass.";
             stamp.innerText = "GO";
         } else if(defScore < 80) {
-            defMsg.innerText = "Aggressive but doable. You'll suffer km 60-110.";
+            defMsg.innerText = "Overcome the Impossible.";
             stamp.innerText = "CAUTION";
         } else if(defScore < 150) {
-            defMsg.innerText = "Very aggressive. Invisible collapse at km 60. Mental preparation required NOW.";
+            defMsg.innerText = "Redefining limits.";
             stamp.innerText = "RISKY";
         } else {
-            defMsg.innerText = "Suicide mission. You WILL break mentally in Champs. Not recommended.";
+            defMsg.innerText = "Redefining limits.";
             stamp.innerText = "DNF";
         }
     }
