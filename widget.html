@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MQ BIOS™ V54 - Lyapunov-Marcora Defiance Protocol</title>
+    <title>MQ BIOS™ V55 - Lyapunov-Marcora Defiance Protocol</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- 1. CORE & RESET --- */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         :root {
             --mq-gold: #D4AF37;
@@ -20,7 +19,6 @@
             --mq-orange: #ff6b00;
         }
         body { background: #000; color: #e0e0e0; margin: 0; padding: 20px 10px; font-family: 'Montserrat', sans-serif; overflow-x: hidden; }
-        /* --- 2. MAIN CHASSIS --- */
         #mq-container {
             background-color: var(--mq-dark);
             border: 1px solid var(--mq-border);
@@ -31,19 +29,16 @@
             position: relative;
             overflow: hidden;
         }
+        /* Sombreado blanco eliminado */
         #mq-container::before {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.05));
-            background-size: 100% 4px; pointer-events: none; z-index: 10; opacity: 0.5;
+            display: none;
         }
-        /* Modos de Estado */
         #mq-container.mode-nominal { border-color: #333; }
         #mq-container.mode-failure { border-color: var(--mq-red); box-shadow: 0 0 50px rgba(255, 51, 51, 0.15); }
         #mq-container.mode-cut { border-color: var(--mq-blue); box-shadow: 0 0 50px rgba(52, 152, 219, 0.15); }
         #mq-container.mode-vomit { border-color: var(--mq-purple); box-shadow: 0 0 50px rgba(155, 89, 182, 0.15); }
         #mq-container.mode-broken { border-color: var(--mq-grey); box-shadow: 0 0 50px rgba(127, 140, 141, 0.15); }
         #mq-container.mode-warning { border-color: var(--mq-orange); box-shadow: 0 0 50px rgba(255, 107, 0, 0.15); }
-        /* --- 3. HEADER (IDENTITY LOCKED) --- */
         .mq-header {
             padding: 15px 20px; border-bottom: 2px solid var(--mq-gold);
             display: flex; justify-content: space-between; align-items: center; background: #080808; position: relative; z-index: 11;
@@ -51,7 +46,6 @@
         .mq-brand { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
         .mq-brand span { color: var(--mq-gold); }
         .mq-ver { font-family: 'Roboto Mono'; font-size: 0.6rem; color: #666; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; }
-        /* --- 4. INPUT GRID --- */
         .bio-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
             gap: 1px; background: #333; border-bottom: 1px solid #333; position: relative; z-index: 11;
@@ -69,7 +63,6 @@
         }
         .bio-select { cursor: pointer; color: var(--mq-gold); }
         .bio-input:focus, .bio-select:focus { color: var(--mq-gold); }
-        /* --- 5. TABS --- */
         .nav-scroller {
             overflow-x: auto; white-space: nowrap; background: #0a0a0a;
             padding: 10px 10px 10px 25px; border-bottom: 1px solid #333; -webkit-overflow-scrolling: touch; position: relative; z-index: 11;
@@ -80,11 +73,11 @@
             width: 140px; padding: 15px 10px; margin-right: 8px;
             border-radius: 2px; cursor: pointer; transition: all 0.2s;
             position: relative;
+            font-family: 'Roboto Mono', monospace;
         }
         .sector-tab.active { background: var(--mq-gold); color: #000; border-color: var(--mq-gold); transform: translateY(2px); }
         .sector-tab.active .tab-meta { color: #222; font-weight: bold; }
         .sector-tab.warning { border-color: var(--mq-orange); box-shadow: 0 0 10px rgba(255, 107, 0, 0.3); }
-
         .tab-name { display: block; font-size: 0.6rem; font-weight: 900; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
         .tab-meta { display: block; font-size: 0.55rem; font-family: 'Roboto Mono'; color: #666; margin-top: 4px; }
         .tab-spd {
@@ -94,14 +87,11 @@
         .tab-warn {
             position: absolute; top: 5px; left: 5px; font-size: 0.8rem;
         }
-        /* --- 6. DASHBOARD --- */
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; min-height: 420px; position: relative; z-index: 11; }
         @media (max-width: 800px) { .dashboard { grid-template-columns: 1fr; } }
         .panel-controls { padding: 30px; border-right: 1px solid #333; background: #0e0e0e; display: flex; flex-direction: column; gap: 30px; }
         .panel-diag { padding: 0; background: #050505; display: flex; align-items: stretch; justify-content: center; }
         .control-block h4 { margin: 0 0 10px 0; color: var(--mq-gold); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* SLIDER */
         .speed-control-wrapper {
             display: flex; align-items: center; gap: 15px;
             background: #1a1a1a; padding: 15px; border-radius: 4px; border: 1px solid #333;
@@ -121,7 +111,6 @@
         .metric-box { background: #151515; padding: 15px 10px; border: 1px solid #333; text-align: center; }
         .m-val { display: block; font-size: 1.2rem; font-weight: 900; font-family: 'Roboto Mono'; }
         .m-lbl { display: block; font-size: 0.6rem; color: #777; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px; }
-        /* --- 7. DIAGNOSTIC SCREEN --- */
         .diag-card {
             border: none; width: 100%; height: 100%; padding: 40px;
             display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
@@ -136,14 +125,12 @@
         .diag-head { font-size: 1.4rem; font-weight: 900; text-transform: uppercase; margin-bottom: 15px; z-index: 2; line-height: 1.1; letter-spacing: 1px; }
         .diag-body { font-size: 0.95rem; color: #bbb; line-height: 1.6; z-index: 2; max-width: 90%; }
         .diag-pt { margin-top: 20px; padding-top: 15px; border-top: 1px solid #333; color: #666; font-style: italic; z-index: 2; display: block; font-size: 0.9rem; }
-        /* Textos */
         .tx-ok { color: #28a745; }
         .tx-warn { color: var(--mq-orange); text-shadow: 0 0 15px var(--mq-orange); }
         .tx-fail { color: var(--mq-red); text-shadow: 0 0 15px var(--mq-red); }
         .tx-cut { color: var(--mq-blue); text-shadow: 0 0 15px var(--mq-blue); }
         .tx-vomit { color: var(--mq-purple); text-shadow: 0 0 15px var(--mq-purple); }
         .tx-broken { color: var(--mq-grey); }
-        /* --- 8. FOOTER --- */
         .mq-footer {
             background: #080808; padding: 20px 30px; border-top: 1px solid #333; position: relative; z-index: 11;
             display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;
@@ -152,7 +139,6 @@
         .global-stat strong { color: #fff; font-size: 1rem; margin-left: 5px; }
         .global-stat.defiance { color: var(--mq-orange); }
         .global-stat.defiance strong { color: var(--mq-orange); font-size: 1.3rem; }
-
         .btn-action {
             background: transparent; border: 1px solid #444; color: #aaa;
             padding: 12px 25px; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;
@@ -160,18 +146,15 @@
         }
         .btn-action:hover { border-color: var(--mq-gold); color: var(--mq-gold); background: rgba(212, 175, 55, 0.05); }
         .mq-disclaimer { background: #000; padding: 15px; text-align: center; border-top: 1px solid #222; font-size: 0.6rem; color: #444; text-transform: uppercase; letter-spacing: 1px; font-family: 'Roboto Mono'; position: relative; z-index: 11; }
-        /* --- 9. PRINT REPORT --- */
         #print-report { display: none; background: #fff; color: #000; padding: 40px; font-family: 'Roboto Mono'; width: 100%; min-height: 100vh; position: absolute; top: 0; left: 0; z-index: 9999; }
         body.printing #mq-container { display: none; }
         body.printing #print-report { display: block; }
-
         .rpt-row { display: flex; border-bottom: 1px solid #ccc; padding: 8px 0; }
         .rpt-cell { flex: 1; font-size: 0.8rem; }
         .rpt-head { font-weight: bold; border-bottom: 2px solid #000; }
         .rpt-stamp { border: 3px solid #000; display: inline-block; padding: 10px 20px; font-weight: 900; margin-top: 30px; transform: rotate(-2deg); font-size: 1.5rem; }
         .rpt-warning { background: #fff3cd; border-left: 4px solid #ff6b00; padding: 15px; margin: 20px 0; font-size: 0.85rem; }
         .rpt-warning strong { color: #ff6b00; display: block; margin-bottom: 5px; font-size: 1rem; }
-
         .stem-cutout { border: 2px dashed #666; margin-top: 30px; padding: 15px; background: #f0f0f0; max-width: 320px; }
         .stem-header { font-weight: 900; font-size: 0.9rem; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px; }
         .stem-row { display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid #ccc; padding: 2px 0; }
@@ -185,13 +168,10 @@
 </head>
 <body>
 <div id="mq-container" class="mode-nominal">
-
-    <!-- HEADER -->
     <div class="mq-header">
         <div class="mq-brand">MQ <span>BIOS™</span></div>
-        <div class="mq-ver">LYAPUNOV-MARCORA DEFIANCE PROTOCOL V54</div>
+        <div class="mq-ver">LYAPUNOV-MARCORA DEFIANCE PROTOCOL V55</div>
     </div>
-    <!-- BIO GRID -->
     <div class="bio-grid">
         <div class="bio-cell">
             <span class="bio-label">WEIGHT (KG)</span>
@@ -222,21 +202,17 @@
             </select>
         </div>
     </div>
-    <!-- TABS -->
     <div class="nav-scroller" id="tabs-container"></div>
-    <!-- DASHBOARD -->
     <div class="dashboard">
         <div class="panel-controls">
-
             <div class="control-block">
                 <h4 id="seg-name">LOADING...</h4>
                 <div style="font-size:0.7rem; color:#666; font-family:'Roboto Mono';" id="seg-details">...</div>
             </div>
-            <!-- SLIDER -->
             <div class="control-block">
                 <h4>TARGET SPEED (VELOCIDADE)</h4>
                 <div class="speed-control-wrapper">
-                    <div class="btn-adj" onclick="MQ_Engine.adjustSpeed(-0.5)">-</div>
+                    <div class="btn-adj" onclick="MQ_Engine.adjustSpeed(-0.5)">−</div>
                     <div class="slider-container">
                         <span class="current-speed" id="disp-speed">12.0 <span>km/h</span></span>
                         <input type="range" id="inp-speed" min="3" max="30" step="0.5" oninput="MQ_Engine.setSpeed(this.value)">
@@ -272,35 +248,28 @@
             </div>
         </div>
     </div>
-    <!-- FOOTER -->
     <div class="mq-footer">
         <div class="global-stat">TOTAL: <strong id="g-time">00h 00m</strong></div>
         <div class="global-stat">DEFICIT: <strong id="g-def">0</strong></div>
         <div class="global-stat">MIND: <strong id="g-mind">100%</strong></div>
         <div class="global-stat defiance">DEFIANCE: <strong id="g-defiance">0</strong></div>
-
         <button class="btn-action" onclick="MQ_Engine.printReport()">PRINT BRIEFING</button>
     </div>
-
     <div class="mq-disclaimer">
         SIMULATION BASED ON OFFICIAL RUTOMETER. "A MATEMÁTICA NÃO PEDALA POR TI." // PROVE US WRONG.
     </div>
 </div>
-<!-- REPORTE -->
 <div id="print-report">
     <div style="border-bottom:4px solid #000; padding-bottom:10px; margin-bottom:20px;">
         <h1 style="margin:0; font-size:2rem;">MQ MISSION BRIEFING</h1>
         <div style="font-size:0.8rem; margin-top:5px; font-family:'Roboto Mono';">
-            PROTOCOL: <b>LYAPUNOV-MARCORA DEFIANCE V54</b> | DATE: 20/06/2026
+            PROTOCOL: <b>LYAPUNOV-MARCORA DEFIANCE V55</b> | DATE: 20/06/2026
         </div>
     </div>
-
     <div style="font-family:'Roboto Mono'; font-size:0.9rem; margin-bottom:30px; background:#eee; padding:10px;">
         PILOT DATA: <span id="r-data">--</span>
     </div>
-
     <div id="r-warnings"></div>
-
     <div style="display:flex; gap:40px; flex-wrap:wrap;">
         <div style="flex:2; min-width:300px;">
             <div class="rpt-row rpt-head">
@@ -311,10 +280,8 @@
                 <div class="rpt-cell">STATUS</div>
             </div>
             <div id="rpt-body"></div>
-
             <div style="margin-top:20px; font-weight:bold;">VERDICT:</div>
             <div class="rpt-stamp" id="r-stamp">APPROVED</div>
-
             <div style="margin-top:30px; padding:15px; background:#f8f9fa; border-left:4px solid #ff6b00;">
                 <strong style="color:#ff6b00; font-size:0.9rem;">DEFIANCE SCORE: <span id="r-defiance">0</span></strong>
                 <p style="margin:10px 0 0 0; font-size:0.75rem; color:#666;" id="r-defiance-msg">Analysis pending...</p>
@@ -334,20 +301,15 @@
     </div>
 </div>
 <script>
-/**
- * MQ LYAPUNOV-MARCORA DEFIANCE PROTOCOL V54
- * NEW: Defiance Score, Sector-Specific Warnings, Amplified Psychological Warfare
- * CASCADA: CLIMA → FÍSICA → INTENSIDAD → FATIGA → MENTE
- */
 const MQ_Engine = {
     idx: 0,
     sectors: [
-        { name: "Start & Aboboreira", dist: 42, elev: 2000, crr: 1.6, cut: 10.5, speed: 12, type: "climb_start", mental_cost: 15, km_start: 0 },
-        { name: "Mafómedes & Ferraria", dist: 33, elev: 1300, crr: 1.5, cut: null, speed: 6, type: "wall", mental_cost: 25, km_start: 42 },
-        { name: "Marão & Gavião", dist: 18, elev: 400, crr: 1.8, cut: 15.5, speed: 6, type: "tech", mental_cost: 15, km_start: 75 },
-        { name: "Cabana / Cravelas", dist: 37, elev: 1100, crr: 1.3, cut: 19.5, speed: 10, type: "roll", mental_cost: 10, km_start: 93 },
-        { name: "Senhora da Graça", dist: 30, elev: 800, crr: 1.2, cut: null, speed: 8, type: "climb_final", mental_cost: 20, km_start: 130 },
-        { name: "Champs-Élysées", dist: 42, elev: 600, crr: 1.1, cut: 24.0, speed: 16, type: "finish", mental_cost: 10, km_start: 160 }
+        { name: "Start & Aboboreira", dist: 42, elev: 2000, crr: 1.6, cut: 10.5, speed: 12, type: "climb_start", mental_cost: 15, km_start: 0, km_end: 42 },
+        { name: "Mafómedes & Ferraria", dist: 33, elev: 1300, crr: 1.5, cut: null, speed: 6, type: "wall", mental_cost: 25, km_start: 42, km_end: 75 },
+        { name: "Marão & Gavião", dist: 18, elev: 400, crr: 1.8, cut: 15.5, speed: 6, type: "tech", mental_cost: 15, km_start: 75, km_end: 93 },
+        { name: "Cabana / Cravelas", dist: 37, elev: 1100, crr: 1.3, cut: 19.5, speed: 10, type: "roll", mental_cost: 10, km_start: 93, km_end: 130 },
+        { name: "Senhora da Graça", dist: 30, elev: 800, crr: 1.2, cut: null, speed: 8, type: "climb_final", mental_cost: 20, km_start: 130, km_end: 160 },
+        { name: "Champs-Élysées", dist: 42, elev: 600, crr: 1.1, cut: 24.0, speed: 16, type: "finish", mental_cost: 10, km_start: 160, km_end: 202 }
     ],
     debounceTimer: null,
     weatherCache: '',
@@ -460,6 +422,7 @@ const MQ_Engine = {
         let failSectorIndex = -1;
         let defianceScore = 0;
         let warnings = [];
+        let marcoraPressure = 0;
 
         if(carbs > 120) {
             failMode = 'vomit';
@@ -467,13 +430,12 @@ const MQ_Engine = {
         }
 
         this.sectors.forEach((s, i) => {
-            // Clear previous warnings
             s.warning = false;
 
             const grade = s.elev / (s.dist * 1000);
             const speedMs = s.speed / 3.6;
 
-            // 1. FÍSICA
+            // FÍSICA
             const pGrav = total_w * 9.81 * speedMs * grade;
             let crr = s.crr;
             if(weather === 'storm') crr *= 1.15;
@@ -489,57 +451,87 @@ const MQ_Engine = {
             const duration = s.dist / s.speed;
             const arrivalTime = currentTime + duration;
 
-            // 2. FISIOLOGÍA: CASCADA CORREGIDA
+            // FISIOLOGÍA
             let baseFtp = ftp;
             if(weather === 'heat') baseFtp *= 0.88;
 
             let effectiveFtp = Math.max(50, baseFtp * (1 - accumulatedFatigue));
             let intensity = sectorWatts / effectiveFtp;
 
-            // 3. DEFIANCE SCORE CALCULATION
+            // MARCORA: FactorMentalMarcora amplifica watts percibidos
+            let factorMarcora = 1 + (0.15 * (1 - Math.max(0, cognitiveReserve) / 100));
+            let perceivedWatts = sectorWatts * factorMarcora;
+            let perceivedIntensity = perceivedWatts / effectiveFtp;
+
+            // DEFIANCE SCORE
             if(intensity > 1.0) defianceScore += 10;
             if(intensity > 1.15) defianceScore += 15;
             if(intensity > 1.3) defianceScore += 25;
 
-            // 4. SECTOR-SPECIFIC WARNINGS
-            if(i === 1 && intensity > 1.0) {
-                s.warning = true;
-                warnings.push({
-                    sector: "MAFÓMEDES (km 50)",
-                    issue: "OVERLOAD DETECTED",
-                    detail: `Intensity ${intensity.toFixed(2)}. Muro Ferraria (40% ramps) incoming at km 65. Current pace = cramps guaranteed.`
-                });
-                defianceScore += 20;
+            // KM 60: INVISIBLE COLLAPSE (Mafómedes)
+            if(s.km_start <= 60 && s.km_end > 60) {
+                if(intensity > 0.95) {
+                    marcoraPressure += 15;
+                    s.warning = true;
+                    warnings.push({
+                        sector: "MAFÓMEDES (km 60)",
+                        issue: "INVISIBLE COLLAPSE INITIATED",
+                        detail: `Intensity ${intensity.toFixed(2)}. Plan shattered. You think recovery comes, but terrain lies. Mental reset incoming.`
+                    });
+                    defianceScore += 25;
+                }
             }
 
-            if(i === 2 && (intensity > 1.1 || accumulatedFatigue > 0.4)) {
-                s.warning = true;
-                warnings.push({
-                    sector: "FERRARIA/GAVIÃO (km 65-85)",
-                    issue: "CRITICAL SECTOR APPROACH",
-                    detail: `Fatigue: ${(accumulatedFatigue * 100).toFixed(0)}%. O Muro da Ferraria + Gavião will break you. Blow-up imminent.`
-                });
-                defianceScore += 30;
+            // KM 110: A CAPELA DISILLUSION
+            if(s.km_start <= 110 && s.km_end > 110) {
+                if(intensity > 0.9 && accumulatedFatigue > 0.35) {
+                    marcoraPressure += 20;
+                    s.warning = true;
+                    warnings.push({
+                        sector: "A CAPELA (km 110)",
+                        issue: "HOPE BETRAYED",
+                        detail: `Expected recovery. Got punishment. 1km durissima when you believed it was over. Mental hit incoming.`
+                    });
+                    defianceScore += 30;
+                }
             }
 
-            // 5. FATIGA
+            // KM 130: CATABATIC WINDS + CRAVELAS
+            if(s.km_start <= 130 && s.km_end > 130) {
+                // Simulate 19:00 arrival for Cravelas crossing
+                if(arrivalTime > 18.5) {
+                    if(intensity > 0.9) {
+                        marcoraPressure += 25;
+                        s.warning = true;
+                        warnings.push({
+                            sector: "CRAVELAS (km 130, ~19h)",
+                            issue: "CATABATIC WINDS + PHANTOM MUTANT",
+                            detail: `Vientos frios del Alvão. Última subida equivalente a Mafómedes. Solo food at Cabana but wind confuses body. Some break here.`
+                        });
+                        defianceScore += 35;
+                    }
+                }
+            }
+
+            // FATIGA
             let fatigueHit = Math.pow(intensity, 3) * duration * 0.05;
             accumulatedFatigue += fatigueHit;
 
-            // 6. PSICOLOGÍA
+            // PSICOLOGÍA: drena más si hay presión Marcora
             let drain = s.mental_cost;
             if(intensity > 0.9) drain *= 1.5;
             if(duration > 4.0) drain += 10;
+            drain += (marcoraPressure * 0.3);
             cognitiveReserve -= drain;
             if(cognitiveReserve < 0) cognitiveReserve = 0;
 
-            // 7. ENERGÍA
+            // ENERGÍA
             const kj = sectorWatts * duration * 3.6;
             const kcalBurn = kj * 1.1;
             const kcalIn = carbs * 4 * duration;
             totalDeficit += (kcalBurn - kcalIn);
 
-            // 8. FAIL-SAFES
+            // FAIL-SAFES
             if (failMode === null) {
                 if((intensity > 1.3 || accumulatedFatigue > 0.70)) {
                     failMode = 'phys';
@@ -570,7 +562,46 @@ const MQ_Engine = {
         const totalDuration = currentTime - 5.0;
         document.getElementById('g-time').innerText = this.fmtDur(totalDuration);
         document.getElementById('g-def').innerText = Math.round(totalDeficit) + ' kcal';
-        document.getElementById('g-mind').innerText = Math.round(cognitiveReserve) + '%';
+
+        // MIND: color dinámico según presión Marcora
+        const mindEl = document.getElementById('g-mind');
+
+        // MAPPING VISUAL: no enseñamos la reserva real tal cual,
+        // sino una versión reescalada para que la aguja respire.
+        let rawMind = cognitiveReserve;            // 0–100 interno
+        if(rawMind < 0) rawMind = 0;
+        if(rawMind > 100) rawMind = 100;
+
+        let displayMind;
+
+        // Alto: si tienes >70 de reserva, nunca enseñamos menos de 80%
+        if(rawMind >= 70) {
+            // 70–100  ->  80–100
+            displayMind = 80 + (rawMind - 70) * (20 / 30);
+        }
+        // Medio: 20–70 de reserva se mapea a 20–80%
+        else if(rawMind >= 20) {
+            // 20–70  ->  20–80
+            displayMind = 20 + (rawMind - 20) * (60 / 50);
+        }
+        // Bajo: <20 de reserva, nunca enseñamos menos de 5%
+        else {
+            // 0–20  ->  5–20
+            displayMind = 5 + rawMind * (15 / 20);
+        }
+
+        displayMind = Math.round(displayMind);
+        mindEl.innerText = displayMind + '%';
+
+        // Colores por rango visual, no por valor crudo
+        if(displayMind >= 70) {
+            mindEl.style.color = '#00ff99'; // verde
+        } else if(displayMind >= 40) {
+            mindEl.style.color = '#ffcc33'; // amarillo
+        } else {
+            mindEl.style.color = '#ff3333'; // rojo
+        }
+
         document.getElementById('g-defiance').innerText = Math.round(defianceScore);
 
         if(failMode === null && cognitiveReserve < 20) {
@@ -603,7 +634,6 @@ const MQ_Engine = {
         if(failMode === 'vomit') showFailure = true;
         else if(failMode && this.idx >= failIdx) showFailure = true;
 
-        // Check for warnings in current sector
         if(s.warning && !showFailure) {
             container.classList.add("mode-warning");
         }
@@ -625,7 +655,6 @@ const MQ_Engine = {
         } else {
             container.classList.add("mode-nominal");
 
-            // SECTOR-SPECIFIC MESSAGES WITH WARNINGS
             if(this.idx===0) {
                 this.setDiag("🧠", "BE SMART", "It's a long day. Don't burn matches early.", "Tem juízo. A prova não se ganha na Aboboreira.");
             }
@@ -633,31 +662,30 @@ const MQ_Engine = {
                 const intensity = parseFloat(s.calc.if);
                 if(intensity > 1.0) {
                     this.setDiag("⚠️", "WARNING: MAFÓMEDES OVERLOAD",
-                        `Intensity ${intensity.toFixed(2)}. Ferraria Wall (40% ramps) at km 65. You WILL cramp. Slow down NOW or blow up LATER.`,
-                        `Intensidade ${intensity.toFixed(2)}. Mafómedes é interminável. O Muro da Ferraria espera. Com este ritmo, vais ter cãibras. GARANTE. Reduz AGORA.`);
+                        `Intensity ${intensity.toFixed(2)}. Ferraria Wall incoming. You WILL cramp. Slow down NOW.`,
+                        `Intensidade ${intensity.toFixed(2)}. Mafómedes é interminável. Reduz AGORA.`);
                 } else {
-                    this.setDiag("🔨", "MARRETALAND", "Mafómedes: The endless climb. Ferraria Wall ahead.", "Aqui é que a porca torce o rabo. Mafómedes interminável. Cuidado com a Marreta.");
+                    this.setDiag("🔨", "MARRETALAND", "Mafómedes: The endless climb. Ferraria Wall ahead.", "Aqui é que a porca torce o rabo.");
                 }
             }
             else if(this.idx===2) {
-                const intensity = parseFloat(s.calc.if);
-                const fatigue = this.globalState.warnings.find(w => w.sector.includes("FERRARIA"));
+                const fatigue = this.globalState.warnings.find(w => w.sector.includes("INVISIBLE"));
                 if(fatigue) {
                     this.setDiag("🌬️", "CRITICAL: GAVIÃO INCOMING",
-                        "Ferraria + Gavião (km 65-93) = The Gauntlet. Most riders blow up HERE. You've been warned.",
-                        "O trecho maldito: Ferraria + Gavião. Aqui explodem quase todos. Já foste avisado. O Gavião não perdoa.");
+                        "The Gauntlet. Most riders blow up HERE. You've been warned.",
+                        "O trecho maldito. Aqui explodem quase todos. O Gavião não perdoa.");
                 } else {
-                    this.setDiag("🌬️", "EXPOSURE", "Marão summit. High winds likely.", "O Marão manda. Não pares se estiver vento.");
+                    this.setDiag("🌬️", "EXPOSURE", "Marão summit. High winds likely.", "O Marão manda.");
                 }
             }
             else if(this.idx===3) {
-                this.setDiag("🍖", "FUEL UP", "Cabana resupply point. Eat solid food or die.", "Come uma sandes de pernil ou não chegas ao fim. Cabana é a última paragem.");
+                this.setDiag("🍖", "FUEL UP", "Cabana resupply point. Eat solid food or die.", "Come uma sandes de pernil ou não chegas.");
             }
             else if(this.idx===4) {
-                this.setDiag("⛪", "THE TEMPLE", "Senhora da Graça. The final boss. If you reach here, you can finish.", "A Senhora da Graça espera por ti. O último altar. Se chegaste aqui vivo, podes terminar. Sofre em silêncio.");
+                this.setDiag("⛪", "THE TEMPLE", "Senhora da Graça. The final boss. If you reach here, you can finish.", "A Senhora da Graça espera por ti. Sofre em silêncio.");
             }
             else if(this.idx===5) {
-                this.setDiag("🏁", "GLORY ROAD", "Finish line ahead. Stay focused. The Mutant awaits.", "Já cheira a meta. Não caias agora. O Mutante espera pelos bravos.");
+                this.setDiag("🏁", "GLORY ROAD", "Finish line ahead. Stay focused. The Mutant awaits.", "Já cheira a meta. O Mutante espera pelos bravos.");
             }
         }
     },
@@ -681,11 +709,14 @@ const MQ_Engine = {
         else { titleEl.classList.add("tx-ok"); iconEl.classList.add("tx-ok"); }
     },
     fmtTime: function(val) {
-        let h = Math.floor(val); let m = Math.round((val - h) * 60);
-        if(h >= 24) h -= 24; return `${h}:${m < 10 ? '0'+m : m}`;
+        let h = Math.floor(val);
+        let m = Math.round((val - h) * 60);
+        if(h >= 24) h -= 24;
+        return `${h}:${m < 10 ? '0'+m : m}`;
     },
     fmtDur: function(val) {
-        let h = Math.floor(val); let m = Math.round((val - h) * 60);
+        let h = Math.floor(val);
+        let m = Math.round((val - h) * 60);
         return `${h}h ${m}m`;
     },
     printReport: function() {
@@ -697,7 +728,6 @@ const MQ_Engine = {
         let stemHtml = '';
         let warningsHtml = '';
 
-        // Warnings section
         if(this.globalState.warnings.length > 0) {
             warningsHtml += '<div class="rpt-warning"><strong>⚠️ CRITICAL SECTORS DETECTED</strong>';
             this.globalState.warnings.forEach(w => {
@@ -709,7 +739,6 @@ const MQ_Engine = {
 
         this.sectors.forEach(s => {
             html += `<div class="rpt-row"><div class="rpt-cell" style="flex:2"><b>${s.name}</b></div><div class="rpt-cell">${s.speed} km/h</div><div class="rpt-cell">${this.fmtDur(s.calc.time)}</div><div class="rpt-cell">${this.fmtTime(s.calc.arrival)}</div><div class="rpt-cell"><b>${s.calc.status}</b></div></div>`;
-
             let shortName = s.name.split(' ')[0].substring(0,10);
             stemHtml += `<div class="stem-row"><span>${shortName}</span><span>${this.fmtTime(s.calc.arrival)}</span></div>`;
         });
@@ -724,33 +753,26 @@ const MQ_Engine = {
 
         const stamp = document.getElementById('r-stamp');
         const state = this.globalState || {};
-
-        // Defiance score message
         const defScore = state.defianceScore || 0;
         document.getElementById('r-defiance').innerText = defScore;
         const defMsg = document.getElementById('r-defiance-msg');
 
         if(defScore < 30) {
-            defMsg.innerText = "Conservative plan. Too safe? Where's your courage?";
-        } else if(defScore < 60) {
-            defMsg.innerText = "Balanced approach. Might work. Prove the BIOS wrong.";
-        } else if(defScore < 90) {
-            defMsg.innerText = "High risk strategy. The BIOS gives you 30% survival. Bold move.";
+            defMsg.innerText = "You shall not pass.";
+            stamp.innerText = "GO";
+        } else if(defScore < 80) {
+            defMsg.innerText = "Overcome the Impossible.";
+            stamp.innerText = "CAUTION";
+        } else if(defScore < 150) {
+            defMsg.innerText = "Redefining limits.";
+            stamp.innerText = "RISKY";
         } else {
-            defMsg.innerText = "SUICIDE MISSION. The BIOS predicts catastrophic failure. We'll see you at km 85. Good luck.";
-        }
-
-        if(state.failMode) {
-            if(state.failMode === 'vomit') { stamp.innerText = "BIOLOGICAL FAIL"; stamp.style.color = "#9b59b6"; stamp.style.borderColor = "#9b59b6"; }
-            else if(state.failMode === 'phys') { stamp.innerText = "DNF PREDICTED"; stamp.style.color = "red"; stamp.style.borderColor = "red"; }
-            else if(state.failMode === 'cut') { stamp.innerText = "TIME CUT"; stamp.style.color = "blue"; stamp.style.borderColor = "blue"; }
-        } else if(state.cognitiveReserve < 20) {
-            stamp.innerText = "FINISHER (NO MUTANT)"; stamp.style.color = "gray"; stamp.style.borderColor = "gray";
-        } else {
-            stamp.innerText = "APPROVED"; stamp.style.color = "green"; stamp.style.borderColor = "green";
+            defMsg.innerText = "Redefining limits.";
+            stamp.innerText = "DNF";
         }
     }
 };
+
 MQ_Engine.init();
 </script>
 </body>
