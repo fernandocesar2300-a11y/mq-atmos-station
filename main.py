@@ -263,8 +263,8 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     is_snow = False
     snow_intensity = "LIGHT"
     
-    # Condición 1: Altitud del sector está bajo la cota de nieve
-    if sector['altitude_m'] < data_now['freezing_level']:
+   # Condición 1: Altitud del sector está SOBRE la cota de nieve
+    if sector['altitude_m'] > data_now['freezing_level']:
         is_snow = True
         
     # Condición 2: Weathercode indica nieve (backup)
