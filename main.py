@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 """
 ═══════════════════════════════════════════════════════════════════════════
-MQ ATMOS LAB: BELLATOR V18.0 (EEI v3.1 INTEGRATION)
+MQ ATMOS LAB: BELLATOR V18.1 (EEI v3.1 + SNOW ALTITUDE LOGIC)
 ═══════════════════════════════════════════════════════════════════════════
 
-CHANGELOG V18.0:
-✅ Reemplazado RSI por EEI v3.1 (JAG/TI + Kinetic Vector)
-✅ Añadido HR% en pérdida conductiva húmeda
-✅ Añadido ángulo solar en ganancia radiante
-✅ Base científica: Osczevski & Bluestein (2001)
-✅ Mantiene toda la funcionalidad visual + FTP de V17.1
+CHANGELOG V18.1:
+✅ CRITICAL FIX: Detección de nieve basada en cota vs altitud de sector
+✅ Añadido snowfall y freezing_level_height desde Open-Meteo
+✅ Alertas de nieve calibradas para Serra do Marão (800-1415m)
+✅ Lógica mountain-aware para precipitación mixta
 
 MODELO:
 EEI = T_wc - P_wet + G_sol
@@ -34,7 +32,7 @@ import ftplib
 import folium
 import math
 
-print("📡 INICIANDO SISTEMA V18.0 (EEI v3.1)...")
+print("📡 INICIANDO SISTEMA V18.1 (EEI v3.1 + SNOW ALTITUDE)...")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO EEI v3.1 (EMBEBIDO)
@@ -226,12 +224,12 @@ def get_weather_text(code):
     return "OVCAST"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# GENERADOR DE TARJETAS (CON EEI v3.1)
+# GENERADOR DE TARJETAS (CON EEI v3.1 + SNOW ALTITUDE LOGIC)
 # ═══════════════════════════════════════════════════════════════════════════
 
 def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     """
-    Genera tarjeta de sector usando EEI v3.1
+    Genera tarjeta de sector usando EEI v3.1 + Snow Altitude Detection
     Mantiene diseño visual de V17.1
     """
     now_ts = datetime.datetime.utcnow()
@@ -259,14 +257,38 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     status = estado_now['nivel']
     color = estado_now['color']
     
-    # Detectar nieve
-    is_snow = data_now['code'] in [71, 73, 75, 77, 85, 86]
+    # ═════════════════════════════════════════════════════════════════════
+    # CRITICAL FIX: Detección de nieve basada en ALTITUD vs COTA
+    # ═════════════════════════════════════════════════════════════════════
+    is_snow = False
+    snow_intensity = "LIGHT"
+    
+    # Condición 1: Altitud del sector está bajo la cota de nieve
+    if sector['altitude_m'] < data_now['freezing_level']:
+        is_snow = True
+        
+    # Condición 2: Weathercode indica nieve (backup)
+    if data_now['code'] in [71, 73, 75, 77, 85, 86]:
+        is_snow = True
+        
+    # Condición 3: Hay snowfall activo
+    if data_now['snowfall'] > 0.1:
+        is_snow = True
+        if data_now['snowfall'] > 1.0:
+            snow_intensity = "MODERATE"
+        if data_now['snowfall'] > 5.0:
+            snow_intensity = "HEAVY"
+    
     if is_snow:
-        status = "SNOW ALERT"
-        color = "#e67e22"
-        if data_now['code'] in [75, 86]:
+        if snow_intensity == "LIGHT":
+            status = "SNOW ALERT"
+            color = "#f1c40f"  # Amarillo
+        elif snow_intensity == "MODERATE":
+            status = "SNOW WARNING"
+            color = "#e67e22"  # Naranja
+        else:  # HEAVY
             status = "BLIZZARD"
-            color = "#e74c3c"
+            color = "#e74c3c"  # Rojo
     
     # Flechas de tendencia
     def get_arrow(curr, fut):
@@ -296,7 +318,8 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     
     # Watermark
     if is_snow:
-        plt.text(0.5, 0.40, "SNOW", color='white', alpha=0.10, 
+        watermark_text = "❄" if snow_intensity == "LIGHT" else "SNOW"
+        plt.text(0.5, 0.40, watermark_text, color='white', alpha=0.10, 
                 fontsize=55, fontweight='bold', ha='center', transform=ax.transAxes)
     else:
         plt.text(0.08, 0.40, get_weather_text(data_now['code']), 
@@ -309,7 +332,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     
     # MRI (MQ Rider Index)
     mri_col = "#38bdf8" if eei_now < data_now['temp'] else "#fca5a5"
-    if status in ["CRITICAL", "DANGER"]:
+    if status in ["CRITICAL", "DANGER", "BLIZZARD"]:
         mri_col = "#ffffff"  # Blanco para alertas críticas
     plt.text(0.92, 0.55, f"MRI: {int(eei_now)}°", color=mri_col, 
             fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
@@ -344,20 +367,22 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
                 dpi=150, facecolor='#0f172a')
     plt.close()
     
-    return status, int(eei_now), data_now['wind']
+    return status, int(eei_now), data_now['wind'], is_snow, snow_intensity
 
 # ═══════════════════════════════════════════════════════════════════════════
 # BANNER PRINCIPAL
 # ═══════════════════════════════════════════════════════════════════════════
 
-def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str):
-    """Genera banner principal - mismo diseño V17.1"""
+def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str, snow_detected):
+    """Genera banner principal - mismo diseño V17.1 + snow awareness"""
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a')
     ax.set_facecolor='#0a0a0a'
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     color = "#2ecc71"
     if "ALERT" in status or "SNOW" in status: 
+        color = "#f1c40f"
+    if "WARNING" in status:
         color = "#e67e22"
     if "CRITICAL" in status or "BLIZZARD" in status: 
         color = "#e74c3c"
@@ -386,6 +411,9 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str)
     if color == "#2ecc71":
         hook = "ALL SECTORS: GREEN LIGHT"
         sub = f"UPDATED: {time_str} UTC | MQ RIDER INDEX™"
+    elif snow_detected:
+        hook = f"SNOW ALERT: {worst_sector}"
+        sub = f"UPDATED: {time_str} UTC | ALTITUDE-AWARE SYSTEM"
     else:
         hook = f"WARNING: {worst_sector}"
         sub = f"UPDATED: {time_str} UTC | MQ RIDER INDEX™"
@@ -453,11 +481,14 @@ worst_status = "STABLE"
 worst_sector = ""
 g_min_eei = 99
 g_max_wind = 0
+snow_detected = False
 
 for sec in sectors:
     try:
-        # API Open-Meteo
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance&forecast_days=2"
+        # ═════════════════════════════════════════════════════════════════
+        # API Open-Meteo CON SNOWFALL Y FREEZING LEVEL
+        # ═════════════════════════════════════════════════════════════════
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
         r = requests.get(url, timeout=10).json()
         
         def get_data(h):
@@ -467,7 +498,9 @@ for sec in sectors:
                 'rain': r['hourly']['precipitation'][h],
                 'hum': r['hourly']['relativehumidity_2m'][h],
                 'code': r['hourly']['weathercode'][h],
-                'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h]
+                'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h],
+                'snowfall': r['hourly'].get('snowfall', [0]*48)[h],
+                'freezing_level': r['hourly'].get('freezing_level_height', [9999]*48)[h]
             }
         
         d_now = get_data(current_hour)
@@ -479,25 +512,28 @@ for sec in sectors:
             d_now['wind'] *= 1.35
             d_now['temp'] -= 2
         
-        # Generar tarjeta con EEI v3.1
-        stat, eei_val, wind_val = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
+        # Generar tarjeta con EEI v3.1 + Snow Altitude Logic
+        stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
         
         # Track worst conditions
         if eei_val < g_min_eei:
             g_min_eei = eei_val
         if wind_val > g_max_wind:
             g_max_wind = wind_val
-        if "ALERT" in stat or "SNOW" in stat:
-            worst_status = "ALERT"
+        if is_snow:
+            snow_detected = True
+        if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat:
+            worst_status = stat
             worst_sector = sec['name']
         
-        print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C")
+        snow_marker = f"❄ [{snow_int}]" if is_snow else ""
+        print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
         
     except Exception as e:
         print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
 
 # Generar banner y mapa
-generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str)
+generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected)
 generate_map()
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -514,8 +550,9 @@ status_data = {
     "worst_sector": worst_sector if worst_sector else "ALL SECTORS",
     "status": worst_status,
     "max_wind": int(g_max_wind),
+    "snow_detected": snow_detected,
     "timestamp_utc": now.isoformat(),
-    "model_version": "MQ Rider Index v3.1",
+    "model_version": "MQ Rider Index v3.1 + Snow Altitude",
     "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"]
 }
 
@@ -577,15 +614,16 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("\n" + "═"*70)
-print("🎯 BELLATOR V18.0 COMPLETADO")
+print("🎯 BELLATOR V18.1 COMPLETADO")
 print("═"*70)
 print(f"📊 Modelo: MQ Rider Index v3.1 (JAG/TI adapted for MTB)")
 print(f"📅 Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
 print(f"🌡️  MIN MRI: {g_min_eei}°C")
 print(f"💨 MAX WIND: {int(g_max_wind)} km/h")
+print(f"❄️  SNOW: {'DETECTED' if snow_detected else 'NONE'}")
 print(f"⚠️  Status: {worst_status}")
 print("═"*70)
-print("\n✨ MQ RIDER INDEX™ v3.1 by Mountain Quest ATMOS LAB™")
+print("\n✨ MQ RIDER INDEX™ v3.1 + SNOW ALTITUDE LOGIC")
 print("   Technical Base: Osczevski & Bluestein (2001) - JAG/TI Standard")
-print("   Proprietary Adaptation: Calibrated for ultra mountain biking")
+print("   Mountain Adaptation: Altitude-aware snow detection (65-1415m)")
 print("═"*70 + "\n")
