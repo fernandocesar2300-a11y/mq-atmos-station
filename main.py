@@ -31,6 +31,7 @@ import os
 import ftplib
 import folium
 import math
+import concurrent.futures
 
 print("📡 INICIANDO SISTEMA V18.1 (EEI v3.1 + SNOW ALTITUDE)...")
 
@@ -564,47 +565,75 @@ except Exception as e:
     print(f"⚠️  Error generando JSON: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════
-# FTP UPLOAD
+# FTP UPLOAD (PARALLEL)
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("\n" + "─"*70)
-print("🚀 SUBIENDO A FTP...")
+print("🚀 SUBIENDO A FTP (PARALLEL)...")
 print("─"*70)
 
 FTP_HOST = "ftp.nexplore.pt"
 
+def upload_file_worker(args):
+    """Worker para subir un archivo individual"""
+    local_path, remote_filename, ftp_host, ftp_user, ftp_pass = args
+    try:
+        session = ftplib.FTP()
+        session.connect(ftp_host, 21, timeout=30)
+        session.login(ftp_user, ftp_pass)
+        session.set_pasv(True)
+        
+        with open(local_path, 'rb') as f:
+            session.storbinary(f'STOR {remote_filename}', f)
+        
+        session.quit()
+        return (remote_filename, True, None)
+    except Exception as e:
+        return (remote_filename, False, str(e))
+
 if "FTP_USER" in os.environ:
     FTP_USER = os.environ["FTP_USER"]
     FTP_PASS = os.environ["FTP_PASS"]
-    
-    try:
-        session = ftplib.FTP()
-        session.connect(FTP_HOST, 21, timeout=30)
-        session.login(FTP_USER, FTP_PASS)
-        session.set_pasv(True)
-        
-        print(f"📍 Conectado: {session.pwd()}")
-        
-        def upload(local, remote):
-            with open(local, 'rb') as f:
-                session.storbinary(f'STOR {remote}', f)
-            print(f"   ✓ {remote}")
-        
-        upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
-        upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", 
-               "MQ_TACTICAL_MAP_CALIBRATED.html")
-        upload(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",
-               "MQ_ATMOS_STATUS.json")
-        
-        for i in range(1, 7):
-            upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", 
-                   f"MQ_SECTOR_{i}_STATUS.png")
-        
-        session.quit()
-        print("\n✅ FTP UPLOAD COMPLETADO")
-        
-    except Exception as e:
-        print(f"\n❌ ERROR FTP: {e}")
+
+    files_to_upload = []
+
+    # 1. Banner
+    files_to_upload.append((f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png", FTP_HOST, FTP_USER, FTP_PASS))
+
+    # 2. Map
+    files_to_upload.append((f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html", FTP_HOST, FTP_USER, FTP_PASS))
+
+    # 3. JSON
+    files_to_upload.append((f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json", "MQ_ATMOS_STATUS.json", FTP_HOST, FTP_USER, FTP_PASS))
+
+    # 4. Sector cards
+    for i in range(1, 7):
+        files_to_upload.append((f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png", FTP_HOST, FTP_USER, FTP_PASS))
+
+    print(f"📡 Iniciando subida paralela ({len(files_to_upload)} archivos, 4 workers)...")
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_file = {executor.submit(upload_file_worker, f): f for f in files_to_upload}
+        for future in concurrent.futures.as_completed(future_to_file):
+            results.append(future.result())
+            remote_name, success, _ = future.result()
+            if success:
+                print(f"   ✓ {remote_name}")
+            else:
+                print(f"   ❌ {remote_name}")
+
+    success_count = sum(1 for r in results if r[1])
+    fail_count = sum(1 for r in results if not r[1])
+
+    print(f"\n✅ FTP SUMMARY: {success_count}/{len(files_to_upload)} Succeeded, {fail_count} Failed")
+
+    if fail_count > 0:
+        print("\n❌ ERRORES DETALLADOS:")
+        for fname, success, error in results:
+            if not success:
+                print(f"   - {fname}: {error}")
+
 else:
     print("⚠️  MODO LOCAL (Variables FTP_USER/FTP_PASS no encontradas)")
     print("   Archivos generados en carpeta 'output/'")
