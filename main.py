@@ -483,54 +483,58 @@ g_min_eei = 99
 g_max_wind = 0
 snow_detected = False
 
-for sec in sectors:
-    try:
-        # ═════════════════════════════════════════════════════════════════
-        # API Open-Meteo CON SNOWFALL Y FREEZING LEVEL
-        # ═════════════════════════════════════════════════════════════════
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
-        r = requests.get(url, timeout=10).json()
-        
-        def get_data(h):
-            return {
-                'temp': r['hourly']['temperature_2m'][h],
-                'wind': r['hourly']['windspeed_10m'][h],
-                'rain': r['hourly']['precipitation'][h],
-                'hum': r['hourly']['relativehumidity_2m'][h],
-                'code': r['hourly']['weathercode'][h],
-                'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h],
-                'snowfall': r['hourly'].get('snowfall', [0]*48)[h],
-                'freezing_level': r['hourly'].get('freezing_level_height', [9999]*48)[h]
-            }
-        
-        d_now = get_data(current_hour)
-        d_3h = get_data(current_hour + 3)
-        d_6h = get_data(current_hour + 6)
-        
-        # Ajuste altitud
-        if sec['altitude_m'] > 1000:
-            d_now['wind'] *= 1.35
-            d_now['temp'] -= 2
-        
-        # Generar tarjeta con EEI v3.1 + Snow Altitude Logic
-        stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
-        
-        # Track worst conditions
-        if eei_val < g_min_eei:
-            g_min_eei = eei_val
-        if wind_val > g_max_wind:
-            g_max_wind = wind_val
-        if is_snow:
-            snow_detected = True
-        if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat:
-            worst_status = stat
-            worst_sector = sec['name']
-        
-        snow_marker = f"❄ [{snow_int}]" if is_snow else ""
-        print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
-        
-    except Exception as e:
-        print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
+http_session = requests.Session()
+try:
+    for sec in sectors:
+        try:
+            # ═════════════════════════════════════════════════════════════════
+            # API Open-Meteo CON SNOWFALL Y FREEZING LEVEL
+            # ═════════════════════════════════════════════════════════════════
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
+            r = http_session.get(url, timeout=10).json()
+
+            def get_data(h):
+                return {
+                    'temp': r['hourly']['temperature_2m'][h],
+                    'wind': r['hourly']['windspeed_10m'][h],
+                    'rain': r['hourly']['precipitation'][h],
+                    'hum': r['hourly']['relativehumidity_2m'][h],
+                    'code': r['hourly']['weathercode'][h],
+                    'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h],
+                    'snowfall': r['hourly'].get('snowfall', [0]*48)[h],
+                    'freezing_level': r['hourly'].get('freezing_level_height', [9999]*48)[h]
+                }
+
+            d_now = get_data(current_hour)
+            d_3h = get_data(current_hour + 3)
+            d_6h = get_data(current_hour + 6)
+
+            # Ajuste altitud
+            if sec['altitude_m'] > 1000:
+                d_now['wind'] *= 1.35
+                d_now['temp'] -= 2
+
+            # Generar tarjeta con EEI v3.1 + Snow Altitude Logic
+            stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
+
+            # Track worst conditions
+            if eei_val < g_min_eei:
+                g_min_eei = eei_val
+            if wind_val > g_max_wind:
+                g_max_wind = wind_val
+            if is_snow:
+                snow_detected = True
+            if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat:
+                worst_status = stat
+                worst_sector = sec['name']
+
+            snow_marker = f"❄ [{snow_int}]" if is_snow else ""
+            print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
+
+        except Exception as e:
+            print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
+finally:
+    http_session.close()
 
 # Generar banner y mapa
 generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected)
