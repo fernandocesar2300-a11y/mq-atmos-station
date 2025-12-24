@@ -1,0 +1,16 @@
+{
+  "last_update": "10:03",
+  "alert_level": "WARNING",
+  "min_mri": -5,
+  "worst_sector": "AMARANTE",
+  "status": "WARNING",
+  "max_wind": 19,
+  "snow_detected": false,
+  "timestamp_utc": "2025-12-24T10:03:08.871321",
+  "model_version": "MQ Rider Index v3.1 + Snow Altitude",
+  "data_sources": [
+    "ECMWF",
+    "Copernicus",
+    "NOAA GFS"
+  ]
+}
