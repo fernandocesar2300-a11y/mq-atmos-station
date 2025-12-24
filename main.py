@@ -31,6 +31,7 @@ import os
 import ftplib
 import folium
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 print("📡 INICIANDO SISTEMA V18.1 (EEI v3.1 + SNOW ALTITUDE)...")
 
@@ -224,6 +225,77 @@ def get_weather_text(code):
     return "OVCAST"
 
 # ═══════════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS (SAFE GET & PARALLEL WORKERS)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def safe_get(lst, idx, default):
+    """Safe list access with bounds checking"""
+    if not lst or idx >= len(lst) or idx < 0:
+        return default
+    return lst[idx]
+
+def fetch_sector_data(sector, session, current_hour):
+    """Worker function for parallel weather fetch"""
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={sector['lat']}&longitude={sector['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
+        r = session.get(url, timeout=10).json()
+        
+        # Check if response has error
+        if 'error' in r:
+            return (sector, None, f"API Error: {r.get('reason', 'Unknown')}")
+
+        def get_data(h):
+            hourly = r.get('hourly', {})
+            return {
+                'temp': safe_get(hourly.get('temperature_2m', []), h, 0.0),
+                'wind': safe_get(hourly.get('windspeed_10m', []), h, 0.0),
+                'rain': safe_get(hourly.get('precipitation', []), h, 0.0),
+                'hum': safe_get(hourly.get('relativehumidity_2m', []), h, 50.0),
+                'code': safe_get(hourly.get('weathercode', []), h, 0),
+                'irradiance': safe_get(hourly.get('global_tilted_irradiance', []), h, 0),
+                'snowfall': safe_get(hourly.get('snowfall', []), h, 0.0),
+                'freezing_level': safe_get(hourly.get('freezing_level_height', []), h, 9999)
+            }
+        
+        d_now = get_data(current_hour)
+        d_3h = get_data(current_hour + 3)
+        d_6h = get_data(current_hour + 6)
+        
+        # Ajuste altitud
+        if sector['altitude_m'] > 1000:
+            d_now['wind'] *= 1.35
+            d_now['temp'] -= 2
+            
+        processed_data = {
+            'now': d_now,
+            '3h': d_3h,
+            '6h': d_6h
+        }
+        
+        return (sector, processed_data, None)
+
+    except Exception as e:
+        return (sector, None, str(e))
+
+def upload_file(filepath, remote_name, ftp_host, ftp_user, ftp_pass):
+    """Worker function for parallel FTP uploads (connect-upload-close pattern)"""
+    ftp = ftplib.FTP()
+    try:
+        ftp.connect(ftp_host, 21, timeout=30)
+        ftp.login(ftp_user, ftp_pass)
+        ftp.set_pasv(True)
+        with open(filepath, 'rb') as f:
+            ftp.storbinary(f'STOR {remote_name}', f)
+        return (remote_name, True, None)
+    except Exception as e:
+        return (remote_name, False, str(e))
+    finally:
+        try:
+            ftp.quit()
+        except:
+            pass
+
+# ═══════════════════════════════════════════════════════════════════════════
 # GENERADOR DE TARJETAS (CON EEI v3.1 + SNOW ALTITUDE LOGIC)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -302,7 +374,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     
     # GENERAR TARJETA
     fig, ax = plt.subplots(figsize=(6, 3.4), facecolor='#0f172a')
-    ax.set_facecolor='#0f172a'
+    ax.set_facecolor('#0f172a') # FIX: Method call
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     # Barra lateral
@@ -376,7 +448,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
 def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str, snow_detected):
     """Genera banner principal - mismo diseño V17.1 + snow awareness"""
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a')
-    ax.set_facecolor='#0a0a0a'
+    ax.set_facecolor('#0a0a0a') # FIX: Method call
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     color = "#2ecc71"
@@ -394,7 +466,7 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str,
     
     # Radar
     ax_radar = fig.add_axes([0.05, 0.15, 0.20, 0.70])
-    ax_radar.set_facecolor='#0a0a0a'
+    ax_radar.set_facecolor('#0a0a0a') # FIX: Method call
     lats = [p[0] for p in track_points]
     lons = [p[1] for p in track_points]
     ax_radar.plot(lons, lats, color=color, linewidth=1.2, alpha=0.9)
@@ -473,7 +545,7 @@ def generate_map():
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("🚀 OBTENIENDO DATOS OPEN-METEO...")
-now = datetime.datetime.now()
+now = datetime.datetime.utcnow() # FIX: UTC
 time_str = now.strftime("%H:%M")
 current_hour = now.hour
 
@@ -483,39 +555,35 @@ g_min_eei = 99
 g_max_wind = 0
 snow_detected = False
 
-for sec in sectors:
-    try:
-        # ═════════════════════════════════════════════════════════════════
-        # API Open-Meteo CON SNOWFALL Y FREEZING LEVEL
-        # ═════════════════════════════════════════════════════════════════
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
-        r = requests.get(url, timeout=10).json()
+# HTTP Session reuse
+http_session = requests.Session()
+
+try:
+    # Parallel Fetch
+    print("   Starting parallel fetch (4 workers)...")
+    results = []
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(fetch_sector_data, s, http_session, current_hour): s for s in sectors}
+        for future in as_completed(futures):
+            results.append(future.result())
+            
+    # Sort by sector ID to maintain order
+    results.sort(key=lambda x: x[0]['id'] if x[0] else 999)
+    
+    # Sequential processing
+    for sector, data, error in results:
+        if error or not data:
+            print(f"❌ {sector['name']:20} | Error: {error if error else 'No data'}")
+            continue
+
+        d_now = data['now']
+        d_3h = data['3h']
+        d_6h = data['6h']
         
-        def get_data(h):
-            return {
-                'temp': r['hourly']['temperature_2m'][h],
-                'wind': r['hourly']['windspeed_10m'][h],
-                'rain': r['hourly']['precipitation'][h],
-                'hum': r['hourly']['relativehumidity_2m'][h],
-                'code': r['hourly']['weathercode'][h],
-                'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h],
-                'snowfall': r['hourly'].get('snowfall', [0]*48)[h],
-                'freezing_level': r['hourly'].get('freezing_level_height', [9999]*48)[h]
-            }
+        # Generate card (Matplotlib is sequential)
+        stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sector, d_now, d_3h, d_6h, time_str)
         
-        d_now = get_data(current_hour)
-        d_3h = get_data(current_hour + 3)
-        d_6h = get_data(current_hour + 6)
-        
-        # Ajuste altitud
-        if sec['altitude_m'] > 1000:
-            d_now['wind'] *= 1.35
-            d_now['temp'] -= 2
-        
-        # Generar tarjeta con EEI v3.1 + Snow Altitude Logic
-        stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
-        
-        # Track worst conditions
+        # Update Stats
         if eei_val < g_min_eei:
             g_min_eei = eei_val
         if wind_val > g_max_wind:
@@ -524,13 +592,13 @@ for sec in sectors:
             snow_detected = True
         if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat:
             worst_status = stat
-            worst_sector = sec['name']
+            worst_sector = sector['name']
         
         snow_marker = f"❄ [{snow_int}]" if is_snow else ""
-        print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
-        
-    except Exception as e:
-        print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
+        print(f"✅ {sector['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
+
+finally:
+    http_session.close()
 
 # Generar banner y mapa
 generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected)
@@ -577,34 +645,30 @@ if "FTP_USER" in os.environ:
     FTP_USER = os.environ["FTP_USER"]
     FTP_PASS = os.environ["FTP_PASS"]
     
-    try:
-        session = ftplib.FTP()
-        session.connect(FTP_HOST, 21, timeout=30)
-        session.login(FTP_USER, FTP_PASS)
-        session.set_pasv(True)
+    # List of files to upload
+    files_to_upload = [
+        (f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png"),
+        (f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html"),
+        (f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json", "MQ_ATMOS_STATUS.json")
+    ]
+    for i in range(1, 7):
+        files_to_upload.append((f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png"))
+
+    print(f"   Starting parallel upload ({len(files_to_upload)} files)...")
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Submit all upload tasks
+        futures = {executor.submit(upload_file, local, remote, FTP_HOST, FTP_USER, FTP_PASS): remote for local, remote in files_to_upload}
         
-        print(f"📍 Conectado: {session.pwd()}")
-        
-        def upload(local, remote):
-            with open(local, 'rb') as f:
-                session.storbinary(f'STOR {remote}', f)
-            print(f"   ✓ {remote}")
-        
-        upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
-        upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", 
-               "MQ_TACTICAL_MAP_CALIBRATED.html")
-        upload(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",
-               "MQ_ATMOS_STATUS.json")
-        
-        for i in range(1, 7):
-            upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", 
-                   f"MQ_SECTOR_{i}_STATUS.png")
-        
-        session.quit()
-        print("\n✅ FTP UPLOAD COMPLETADO")
-        
-    except Exception as e:
-        print(f"\n❌ ERROR FTP: {e}")
+        for future in as_completed(futures):
+            remote_name, success, error = future.result()
+            if success:
+                print(f"   ✓ {remote_name}")
+            else:
+                print(f"   ❌ {remote_name} - {error}")
+                
+    print("\n✅ FTP UPLOAD COMPLETADO")
+
 else:
     print("⚠️  MODO LOCAL (Variables FTP_USER/FTP_PASS no encontradas)")
     print("   Archivos generados en carpeta 'output/'")
