@@ -1,12 +1,7 @@
 """
 ═══════════════════════════════════════════════════════════════════════════
-MQ ATMOS LAB: BELLATOR V18.2 (EEI v3.1 + SNOW ALTITUDE + HOME BRIEFING)
+MQ ATMOS LAB: BELLATOR V18.1 (EEI v3.1 + SNOW ALTITUDE)
 ═══════════════════════════════════════════════════════════════════════════
-
-CHANGELOG V18.2:
-✅ Añadida tarjeta HOME BRIEFING CARD (teletype style)
-✅ Race Impact Analysis integrado ("If the race was today")
-✅ Mantiene toda funcionalidad V18.1 intacta
 
 CHANGELOG V18.1:
 ✅ CRITICAL FIX: Detección de nieve basada en cota vs altitud de sector
@@ -33,7 +28,7 @@ import ftplib
 import folium
 import math
 
-print("📡 INICIANDO SISTEMA V18.2 (EEI v3.1 + HOME BRIEFING)...")
+print("📡 INICIANDO SISTEMA V18.1 (EEI v3.1 + SNOW ALTITUDE)...")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO EEI v3.1 (EMBEBIDO)
@@ -231,7 +226,6 @@ def get_weather_text(code):
 def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     """
     Genera tarjeta de sector usando EEI v3.1 + Snow Altitude Detection
-    Mantiene diseño visual de V17.1
     """
     now_ts = datetime.datetime.utcnow()
     
@@ -258,9 +252,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     status = estado_now['nivel']
     color = estado_now['color']
     
-    # ═════════════════════════════════════════════════════════════════════
-    # CRITICAL FIX: Detección de nieve basada en ALTITUD vs COTA
-    # ═════════════════════════════════════════════════════════════════════
+    # Detección de nieve basada en ALTITUD vs COTA
     is_snow = False
     snow_intensity = "LIGHT"
     
@@ -283,13 +275,13 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     if is_snow:
         if snow_intensity == "LIGHT":
             status = "SNOW ALERT"
-            color = "#f1c40f"  # Amarillo
+            color = "#f1c40f"
         elif snow_intensity == "MODERATE":
             status = "SNOW WARNING"
-            color = "#e67e22"  # Naranja
-        else:  # HEAVY
+            color = "#e67e22"
+        else:
             status = "BLIZZARD"
-            color = "#e74c3c"  # Rojo
+            color = "#e74c3c"
     
     # Flechas de tendencia
     def get_arrow(curr, fut):
@@ -331,10 +323,10 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.text(0.92, 0.68, f"{int(data_now['temp'])}°", color='white', 
             fontsize=38, fontweight='bold', ha='right', transform=ax.transAxes)
     
-    # MRI (MQ Rider Index)
+    # MRI
     mri_col = "#38bdf8" if eei_now < data_now['temp'] else "#fca5a5"
     if status in ["CRITICAL", "DANGER", "BLIZZARD"]:
-        mri_col = "#ffffff"  # Blanco para alertas críticas
+        mri_col = "#ffffff"
     plt.text(0.92, 0.55, f"MRI: {int(eei_now)}°", color=mri_col, 
             fontsize=10, fontweight='bold', ha='right', transform=ax.transAxes)
     
@@ -342,7 +334,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.text(0.92, 0.45, f"WIND {int(data_now['wind'])} km/h", 
             color='#94a3b8', fontsize=7, ha='right', transform=ax.transAxes)
     
-    # Status badge (texto siempre blanco para máxima visibilidad)
+    # Status badge
     bbox = dict(boxstyle="round,pad=0.4", fc=color, ec="none", alpha=0.9)
     plt.text(0.92, 0.25, f" {status} ", color='white', fontsize=9, 
             ha='right', fontweight='bold', bbox=bbox, transform=ax.transAxes)
@@ -351,7 +343,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.plot([0.05, 0.95], [0.15, 0.15], color='#334155', 
             linewidth=1, transform=ax.transAxes)
     
-    # Forecast (con lógica altitud para nieve)
+    # Forecast con lógica altitud para nieve
     def get_precip_type(code, temp, alt, frz):
         if code < 51: return get_weather_text(code)
         if alt > frz or temp <= 1: 
@@ -363,12 +355,13 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     
     f_3h = f"+3H: {f_3h_type} {int(data_3h['temp'])}° {arrow_3h}"
     f_6h = f"+6H: {f_6h_type} {int(data_6h['temp'])}° {arrow_6h}"
+    
     plt.text(0.05, 0.09, f_3h, color='#94a3b8', fontsize=9, 
             fontweight='bold', ha='left', transform=ax.transAxes)
     plt.text(0.95, 0.09, f_6h, color='#94a3b8', fontsize=9, 
             fontweight='bold', ha='right', transform=ax.transAxes)
     
-    # Timestamp + branding
+    # Timestamp
     plt.text(0.5, 0.02, f"UPDATED: {time_str} (UTC) | MQ RIDER INDEX™ v3.1", 
             color='#475569', fontsize=6, ha='center', transform=ax.transAxes)
     
@@ -384,7 +377,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str, snow_detected):
-    """Genera banner principal - mismo diseño V17.1 + snow awareness"""
+    """Genera banner principal"""
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a')
     ax.set_facecolor='#0a0a0a'
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
@@ -461,125 +454,6 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str,
     plt.close()
 
 # ═══════════════════════════════════════════════════════════════════════════
-# HOME BRIEFING CARD (NUEVO EN V18.2)
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generate_home_briefing_card(status, min_eei, max_wind, worst_sector, time_str, snow_detected, freezing_level):
-    """
-    Genera tarjeta briefing para HOME (teletype style)
-    """
-    fig, ax = plt.subplots(figsize=(8, 3.5), facecolor='#0a0a0a')
-    ax.set_facecolor='#0a0a0a'
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    
-    # Determinar color de alerta
-    if "CRITICAL" in status or "BLIZZARD" in status:
-        alert_color = "#e74c3c"
-        race_status = "RED FLAG - EXTREME CONDITIONS"
-        race_decision = "POSTPONEMENT RECOMMENDED"
-    elif "WARNING" in status or snow_detected:
-        alert_color = "#e67e22"
-        race_status = "YELLOW FLAG - CHALLENGING"
-        race_decision = "PROCEED WITH HIGH CAUTION"
-    elif "ALERT" in status:
-        alert_color = "#f1c40f"
-        race_status = "CAUTION FLAG"
-        race_decision = "MONITOR CONDITIONS"
-    else:
-        alert_color = "#2ecc71"
-        race_status = "GREEN FLAG"
-        race_decision = "NORMAL CONDITIONS"
-    
-    # Barra superior
-    rect_top = patches.Rectangle((0, 0.92), 1, 0.08, transform=ax.transAxes,
-                                 linewidth=0, facecolor='#1a1a1a')
-    ax.add_patch(rect_top)
-    
-    # Título principal
-    plt.text(0.03, 0.96, "MQ WEATHER BRIEFING", color='white',
-            fontsize=14, fontweight='bold', transform=ax.transAxes, va='center')
-    
-    plt.text(0.97, 0.96, f"UPDATED: {time_str} UTC", color='#666',
-            fontsize=8, ha='right', transform=ax.transAxes, va='center')
-    
-    # Línea separadora
-    plt.plot([0.03, 0.97], [0.88, 0.88], color='#333', linewidth=1, transform=ax.transAxes)
-    
-    # STATUS PRINCIPAL
-    plt.text(0.03, 0.78, "STATUS:", color='#888', fontsize=9, 
-            fontweight='bold', transform=ax.transAxes)
-    
-    status_text = f"⚠ {status}" if snow_detected else status
-    plt.text(0.16, 0.78, status_text, color=alert_color, fontsize=11,
-            fontweight='bold', transform=ax.transAxes)
-    
-    # Detalle alertas
-    if snow_detected:
-        detail_text = f"Active on high mountain sectors (>1200m)"
-        plt.text(0.03, 0.70, detail_text, color='#aaa', fontsize=8, transform=ax.transAxes)
-    else:
-        detail_text = f"All sectors monitored • {worst_sector if worst_sector else 'Multiple areas'}"
-        plt.text(0.03, 0.70, detail_text, color='#aaa', fontsize=8, transform=ax.transAxes)
-    
-    # Línea separadora
-    plt.plot([0.03, 0.97], [0.64, 0.64], color='#333', linewidth=1, transform=ax.transAxes)
-    
-    # DATOS CLAVE (estilo teletipo)
-    data_y = 0.56
-    plt.text(0.03, data_y, f"MIN MRI.............. {min_eei}°C", 
-            color='#38bdf8', fontsize=9, fontfamily='monospace', transform=ax.transAxes)
-    
-    plt.text(0.40, data_y, f"MAX WIND............. {int(max_wind)} km/h",
-            color='#fca5a5' if max_wind > 30 else '#aaa', fontsize=9, 
-            fontfamily='monospace', transform=ax.transAxes)
-    
-    plt.text(0.75, data_y, f"FREEZING............ {int(freezing_level)}m",
-            color='#aaa', fontsize=9, fontfamily='monospace', transform=ax.transAxes)
-    
-    # Línea separadora
-    plt.plot([0.03, 0.97], [0.48, 0.48], color='#333', linewidth=1, transform=ax.transAxes)
-    
-    # RACE IMPACT ANALYSIS
-    plt.text(0.03, 0.38, "⚡ IF THE RACE WAS TODAY:", color='#f39c12',
-            fontsize=10, fontweight='bold', transform=ax.transAxes)
-    
-    plt.text(0.03, 0.30, race_decision, color=alert_color,
-            fontsize=9, fontweight='bold', transform=ax.transAxes)
-    
-    # Razón
-    if min_eei < -15:
-        reason = "Hypothermia risk CRITICAL on exposed high mountain sectors"
-    elif min_eei < -5:
-        reason = "Cold exposure risk on technical climbs and descents"
-    elif snow_detected:
-        reason = "Snow accumulation affecting traction and visibility"
-    else:
-        reason = "Conditions within normal racing parameters"
-    
-    plt.text(0.03, 0.22, reason, color='#888', fontsize=8,
-            fontstyle='italic', transform=ax.transAxes)
-    
-    # Línea separadora
-    plt.plot([0.03, 0.97], [0.14, 0.14], color='#333', linewidth=1, transform=ax.transAxes)
-    
-    # CALL TO ACTION
-    bbox_cta = dict(boxstyle="round,pad=0.5", fc='#1a1a1a', ec='#555', linewidth=2)
-    plt.text(0.50, 0.07, "▶ ACCESS FULL METEO STATION • 6 SECTORS MONITORED",
-            color='#aaa', fontsize=9, ha='center', bbox=bbox_cta,
-            fontweight='bold', transform=ax.transAxes)
-    
-    # Footer
-    plt.text(0.50, 0.01, "MQ ATMOS™ • DATA SOURCES: ECMWF / COPERNICUS / NOAA GFS",
-            color='#444', fontsize=6, ha='center', transform=ax.transAxes)
-    
-    ax.axis('off')
-    plt.savefig(f"{OUTPUT_FOLDER}MQ_HOME_BRIEFING_CARD.png", 
-                facecolor='#0a0a0a', dpi=150)
-    plt.close()
-    
-    print("✅ HOME BRIEFING CARD generada")
-
-# ═══════════════════════════════════════════════════════════════════════════
 # MAPA TÁCTICO
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -611,13 +485,9 @@ worst_sector = ""
 g_min_eei = 99
 g_max_wind = 0
 snow_detected = False
-g_freezing_level = 9999
 
 for sec in sectors:
     try:
-        # ═════════════════════════════════════════════════════════════════
-        # API Open-Meteo CON SNOWFALL Y FREEZING LEVEL
-        # ═════════════════════════════════════════════════════════════════
         url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
         r = requests.get(url, timeout=10).json()
         
@@ -637,16 +507,12 @@ for sec in sectors:
         d_3h = get_data(current_hour + 3)
         d_6h = get_data(current_hour + 6)
         
-        # Track freezing level más bajo
-        if d_now['freezing_level'] < g_freezing_level:
-            g_freezing_level = d_now['freezing_level']
-        
         # Ajuste altitud
         if sec['altitude_m'] > 1000:
             d_now['wind'] *= 1.35
             d_now['temp'] -= 2
         
-        # Generar tarjeta con EEI v3.1 + Snow Altitude Logic
+        # Generar tarjeta
         stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
         
         # Track worst conditions
@@ -666,13 +532,12 @@ for sec in sectors:
     except Exception as e:
         print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
 
-# Generar banner, mapa y HOME BRIEFING CARD
+# Generar banner y mapa
 generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected)
 generate_map()
-generate_home_briefing_card(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected, g_freezing_level)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# GENERAR JSON DE ESTADO (PARA WIDGET)
+# GENERAR JSON
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("📊 GENERANDO JSON DE ESTADO...")
@@ -686,7 +551,6 @@ status_data = {
     "status": worst_status,
     "max_wind": int(g_max_wind),
     "snow_detected": snow_detected,
-    "freezing_level": int(g_freezing_level),
     "timestamp_utc": now.isoformat(),
     "model_version": "MQ Rider Index v3.1 + Snow Altitude",
     "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"]
@@ -727,7 +591,6 @@ if "FTP_USER" in os.environ:
             print(f"   ✓ {remote}")
         
         upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
-        upload(f"{OUTPUT_FOLDER}MQ_HOME_BRIEFING_CARD.png", "MQ_HOME_BRIEFING_CARD.png")  # NUEVO
         upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", 
                "MQ_TACTICAL_MAP_CALIBRATED.html")
         upload(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",
@@ -751,18 +614,16 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("\n" + "═"*70)
-print("🎯 BELLATOR V18.2 COMPLETADO")
+print("🎯 BELLATOR V18.1 COMPLETADO")
 print("═"*70)
 print(f"📊 Modelo: MQ Rider Index v3.1 (JAG/TI adapted for MTB)")
 print(f"📅 Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
 print(f"🌡️  MIN MRI: {g_min_eei}°C")
 print(f"💨 MAX WIND: {int(g_max_wind)} km/h")
 print(f"❄️  SNOW: {'DETECTED' if snow_detected else 'NONE'}")
-print(f"🧊 FREEZING LEVEL: {int(g_freezing_level)}m")
 print(f"⚠️  Status: {worst_status}")
 print("═"*70)
-print("\n✨ MQ RIDER INDEX™ v3.1 + HOME BRIEFING CARD")
+print("\n✨ MQ RIDER INDEX™ v3.1 + SNOW ALTITUDE LOGIC")
 print("   Technical Base: Osczevski & Bluestein (2001) - JAG/TI Standard")
 print("   Mountain Adaptation: Altitude-aware snow detection (65-1415m)")
-print("   NEW: Home briefing card with race impact analysis")
 print("═"*70 + "\n")
