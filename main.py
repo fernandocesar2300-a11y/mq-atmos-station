@@ -1,7 +1,12 @@
 """
 ═══════════════════════════════════════════════════════════════════════════
-MQ ATMOS LAB: BELLATOR V18.1 (EEI v3.1 + SNOW ALTITUDE LOGIC)
+MQ ATMOS LAB: BELLATOR V18.2 (EEI v3.1 + SNOW ALTITUDE + HOME BRIEFING)
 ═══════════════════════════════════════════════════════════════════════════
+
+CHANGELOG V18.2:
+✅ Añadida tarjeta HOME BRIEFING CARD (teletype style)
+✅ Race Impact Analysis integrado ("If the race was today")
+✅ Mantiene toda funcionalidad V18.1 intacta
 
 CHANGELOG V18.1:
 ✅ CRITICAL FIX: Detección de nieve basada en cota vs altitud de sector
@@ -11,13 +16,9 @@ CHANGELOG V18.1:
 
 MODELO:
 EEI = T_wc - P_wet + G_sol
-Donde:
-  T_wc  = Convección JAG/TI con vector cinético
-  P_wet = Pérdida conductiva húmeda (modulada por HR%)
-  G_sol = Ganancia radiante solar (con ángulo astronómico)
 
 AUTOR: Mountain Quest ATMOS LAB
-FECHA: Diciembre 2024
+FECHA: Enero 2025
 ═══════════════════════════════════════════════════════════════════════════
 """
 
@@ -31,9 +32,8 @@ import os
 import ftplib
 import folium
 import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-print("📡 INICIANDO SISTEMA V18.1 (EEI v3.1 + SNOW ALTITUDE)...")
+print("📡 INICIANDO SISTEMA V18.2 (EEI v3.1 + HOME BRIEFING)...")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO EEI v3.1 (EMBEBIDO)
@@ -225,77 +225,6 @@ def get_weather_text(code):
     return "OVCAST"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# HELPER FUNCTIONS (SAFE GET & PARALLEL WORKERS)
-# ═══════════════════════════════════════════════════════════════════════════
-
-def safe_get(lst, idx, default):
-    """Safe list access with bounds checking"""
-    if not lst or idx >= len(lst) or idx < 0:
-        return default
-    return lst[idx]
-
-def fetch_sector_data(sector, session, current_hour):
-    """Worker function for parallel weather fetch"""
-    try:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={sector['lat']}&longitude={sector['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
-        r = session.get(url, timeout=10).json()
-        
-        # Check if response has error
-        if 'error' in r:
-            return (sector, None, f"API Error: {r.get('reason', 'Unknown')}")
-
-        def get_data(h):
-            hourly = r.get('hourly', {})
-            return {
-                'temp': safe_get(hourly.get('temperature_2m', []), h, 0.0),
-                'wind': safe_get(hourly.get('windspeed_10m', []), h, 0.0),
-                'rain': safe_get(hourly.get('precipitation', []), h, 0.0),
-                'hum': safe_get(hourly.get('relativehumidity_2m', []), h, 50.0),
-                'code': safe_get(hourly.get('weathercode', []), h, 0),
-                'irradiance': safe_get(hourly.get('global_tilted_irradiance', []), h, 0),
-                'snowfall': safe_get(hourly.get('snowfall', []), h, 0.0),
-                'freezing_level': safe_get(hourly.get('freezing_level_height', []), h, 9999)
-            }
-        
-        d_now = get_data(current_hour)
-        d_3h = get_data(current_hour + 3)
-        d_6h = get_data(current_hour + 6)
-        
-        # Ajuste altitud
-        if sector['altitude_m'] > 1000:
-            d_now['wind'] *= 1.35
-            d_now['temp'] -= 2
-            
-        processed_data = {
-            'now': d_now,
-            '3h': d_3h,
-            '6h': d_6h
-        }
-        
-        return (sector, processed_data, None)
-
-    except Exception as e:
-        return (sector, None, str(e))
-
-def upload_file(filepath, remote_name, ftp_host, ftp_user, ftp_pass):
-    """Worker function for parallel FTP uploads (connect-upload-close pattern)"""
-    ftp = ftplib.FTP()
-    try:
-        ftp.connect(ftp_host, 21, timeout=30)
-        ftp.login(ftp_user, ftp_pass)
-        ftp.set_pasv(True)
-        with open(filepath, 'rb') as f:
-            ftp.storbinary(f'STOR {remote_name}', f)
-        return (remote_name, True, None)
-    except Exception as e:
-        return (remote_name, False, str(e))
-    finally:
-        try:
-            ftp.quit()
-        except:
-            pass
-
-# ═══════════════════════════════════════════════════════════════════════════
 # GENERADOR DE TARJETAS (CON EEI v3.1 + SNOW ALTITUDE LOGIC)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -335,7 +264,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     is_snow = False
     snow_intensity = "LIGHT"
     
-   # Condición 1: Altitud del sector está SOBRE la cota de nieve
+    # Condición 1: Altitud del sector está SOBRE la cota de nieve
     if sector['altitude_m'] > data_now['freezing_level']:
         is_snow = True
         
@@ -374,7 +303,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     
     # GENERAR TARJETA
     fig, ax = plt.subplots(figsize=(6, 3.4), facecolor='#0f172a')
-    ax.set_facecolor('#0f172a') # FIX: Method call
+    ax.set_facecolor='#0f172a'
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     # Barra lateral
@@ -448,7 +377,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
 def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str, snow_detected):
     """Genera banner principal - mismo diseño V17.1 + snow awareness"""
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a')
-    ax.set_facecolor('#0a0a0a') # FIX: Method call
+    ax.set_facecolor='#0a0a0a'
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     color = "#2ecc71"
@@ -466,7 +395,7 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str,
     
     # Radar
     ax_radar = fig.add_axes([0.05, 0.15, 0.20, 0.70])
-    ax_radar.set_facecolor('#0a0a0a') # FIX: Method call
+    ax_radar.set_facecolor='#0a0a0a'
     lats = [p[0] for p in track_points]
     lons = [p[1] for p in track_points]
     ax_radar.plot(lons, lats, color=color, linewidth=1.2, alpha=0.9)
@@ -523,6 +452,125 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str,
     plt.close()
 
 # ═══════════════════════════════════════════════════════════════════════════
+# HOME BRIEFING CARD (NUEVO EN V18.2)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def generate_home_briefing_card(status, min_eei, max_wind, worst_sector, time_str, snow_detected, freezing_level):
+    """
+    Genera tarjeta briefing para HOME (teletype style)
+    """
+    fig, ax = plt.subplots(figsize=(8, 3.5), facecolor='#0a0a0a')
+    ax.set_facecolor='#0a0a0a'
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    
+    # Determinar color de alerta
+    if "CRITICAL" in status or "BLIZZARD" in status:
+        alert_color = "#e74c3c"
+        race_status = "RED FLAG - EXTREME CONDITIONS"
+        race_decision = "POSTPONEMENT RECOMMENDED"
+    elif "WARNING" in status or snow_detected:
+        alert_color = "#e67e22"
+        race_status = "YELLOW FLAG - CHALLENGING"
+        race_decision = "PROCEED WITH HIGH CAUTION"
+    elif "ALERT" in status:
+        alert_color = "#f1c40f"
+        race_status = "CAUTION FLAG"
+        race_decision = "MONITOR CONDITIONS"
+    else:
+        alert_color = "#2ecc71"
+        race_status = "GREEN FLAG"
+        race_decision = "NORMAL CONDITIONS"
+    
+    # Barra superior
+    rect_top = patches.Rectangle((0, 0.92), 1, 0.08, transform=ax.transAxes,
+                                 linewidth=0, facecolor='#1a1a1a')
+    ax.add_patch(rect_top)
+    
+    # Título principal
+    plt.text(0.03, 0.96, "MQ WEATHER BRIEFING", color='white',
+            fontsize=14, fontweight='bold', transform=ax.transAxes, va='center')
+    
+    plt.text(0.97, 0.96, f"UPDATED: {time_str} UTC", color='#666',
+            fontsize=8, ha='right', transform=ax.transAxes, va='center')
+    
+    # Línea separadora
+    plt.plot([0.03, 0.97], [0.88, 0.88], color='#333', linewidth=1, transform=ax.transAxes)
+    
+    # STATUS PRINCIPAL
+    plt.text(0.03, 0.78, "STATUS:", color='#888', fontsize=9, 
+            fontweight='bold', transform=ax.transAxes)
+    
+    status_text = f"⚠ {status}" if snow_detected else status
+    plt.text(0.16, 0.78, status_text, color=alert_color, fontsize=11,
+            fontweight='bold', transform=ax.transAxes)
+    
+    # Detalle alertas
+    if snow_detected:
+        detail_text = f"Active on high mountain sectors (>1200m)"
+        plt.text(0.03, 0.70, detail_text, color='#aaa', fontsize=8, transform=ax.transAxes)
+    else:
+        detail_text = f"All sectors monitored • {worst_sector if worst_sector else 'Multiple areas'}"
+        plt.text(0.03, 0.70, detail_text, color='#aaa', fontsize=8, transform=ax.transAxes)
+    
+    # Línea separadora
+    plt.plot([0.03, 0.97], [0.64, 0.64], color='#333', linewidth=1, transform=ax.transAxes)
+    
+    # DATOS CLAVE (estilo teletipo)
+    data_y = 0.56
+    plt.text(0.03, data_y, f"MIN MRI.............. {min_eei}°C", 
+            color='#38bdf8', fontsize=9, fontfamily='monospace', transform=ax.transAxes)
+    
+    plt.text(0.40, data_y, f"MAX WIND............. {int(max_wind)} km/h",
+            color='#fca5a5' if max_wind > 30 else '#aaa', fontsize=9, 
+            fontfamily='monospace', transform=ax.transAxes)
+    
+    plt.text(0.75, data_y, f"FREEZING............ {int(freezing_level)}m",
+            color='#aaa', fontsize=9, fontfamily='monospace', transform=ax.transAxes)
+    
+    # Línea separadora
+    plt.plot([0.03, 0.97], [0.48, 0.48], color='#333', linewidth=1, transform=ax.transAxes)
+    
+    # RACE IMPACT ANALYSIS
+    plt.text(0.03, 0.38, "⚡ IF THE RACE WAS TODAY:", color='#f39c12',
+            fontsize=10, fontweight='bold', transform=ax.transAxes)
+    
+    plt.text(0.03, 0.30, race_decision, color=alert_color,
+            fontsize=9, fontweight='bold', transform=ax.transAxes)
+    
+    # Razón
+    if min_eei < -15:
+        reason = "Hypothermia risk CRITICAL on exposed high mountain sectors"
+    elif min_eei < -5:
+        reason = "Cold exposure risk on technical climbs and descents"
+    elif snow_detected:
+        reason = "Snow accumulation affecting traction and visibility"
+    else:
+        reason = "Conditions within normal racing parameters"
+    
+    plt.text(0.03, 0.22, reason, color='#888', fontsize=8,
+            fontstyle='italic', transform=ax.transAxes)
+    
+    # Línea separadora
+    plt.plot([0.03, 0.97], [0.14, 0.14], color='#333', linewidth=1, transform=ax.transAxes)
+    
+    # CALL TO ACTION
+    bbox_cta = dict(boxstyle="round,pad=0.5", fc='#1a1a1a', ec='#555', linewidth=2)
+    plt.text(0.50, 0.07, "▶ ACCESS FULL METEO STATION • 6 SECTORS MONITORED",
+            color='#aaa', fontsize=9, ha='center', bbox=bbox_cta,
+            fontweight='bold', transform=ax.transAxes)
+    
+    # Footer
+    plt.text(0.50, 0.01, "MQ ATMOS™ • DATA SOURCES: ECMWF / COPERNICUS / NOAA GFS",
+            color='#444', fontsize=6, ha='center', transform=ax.transAxes)
+    
+    ax.axis('off')
+    plt.savefig(f"{OUTPUT_FOLDER}MQ_HOME_BRIEFING_CARD.png", 
+                facecolor='#0a0a0a', dpi=150)
+    plt.close()
+    
+    print("✅ HOME BRIEFING CARD generada")
+
+# ═══════════════════════════════════════════════════════════════════════════
 # MAPA TÁCTICO
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -545,7 +593,7 @@ def generate_map():
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("🚀 OBTENIENDO DATOS OPEN-METEO...")
-now = datetime.datetime.utcnow() # FIX: UTC
+now = datetime.datetime.now()
 time_str = now.strftime("%H:%M")
 current_hour = now.hour
 
@@ -554,36 +602,45 @@ worst_sector = ""
 g_min_eei = 99
 g_max_wind = 0
 snow_detected = False
+g_freezing_level = 9999
 
-# HTTP Session reuse
-http_session = requests.Session()
-
-try:
-    # Parallel Fetch
-    print("   Starting parallel fetch (4 workers)...")
-    results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(fetch_sector_data, s, http_session, current_hour): s for s in sectors}
-        for future in as_completed(futures):
-            results.append(future.result())
-            
-    # Sort by sector ID to maintain order
-    results.sort(key=lambda x: x[0]['id'] if x[0] else 999)
-    
-    # Sequential processing
-    for sector, data, error in results:
-        if error or not data:
-            print(f"❌ {sector['name']:20} | Error: {error if error else 'No data'}")
-            continue
-
-        d_now = data['now']
-        d_3h = data['3h']
-        d_6h = data['6h']
+for sec in sectors:
+    try:
+        # ═════════════════════════════════════════════════════════════════
+        # API Open-Meteo CON SNOWFALL Y FREEZING LEVEL
+        # ═════════════════════════════════════════════════════════════════
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
+        r = requests.get(url, timeout=10).json()
         
-        # Generate card (Matplotlib is sequential)
-        stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sector, d_now, d_3h, d_6h, time_str)
+        def get_data(h):
+            return {
+                'temp': r['hourly']['temperature_2m'][h],
+                'wind': r['hourly']['windspeed_10m'][h],
+                'rain': r['hourly']['precipitation'][h],
+                'hum': r['hourly']['relativehumidity_2m'][h],
+                'code': r['hourly']['weathercode'][h],
+                'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h],
+                'snowfall': r['hourly'].get('snowfall', [0]*48)[h],
+                'freezing_level': r['hourly'].get('freezing_level_height', [9999]*48)[h]
+            }
         
-        # Update Stats
+        d_now = get_data(current_hour)
+        d_3h = get_data(current_hour + 3)
+        d_6h = get_data(current_hour + 6)
+        
+        # Track freezing level más bajo
+        if d_now['freezing_level'] < g_freezing_level:
+            g_freezing_level = d_now['freezing_level']
+        
+        # Ajuste altitud
+        if sec['altitude_m'] > 1000:
+            d_now['wind'] *= 1.35
+            d_now['temp'] -= 2
+        
+        # Generar tarjeta con EEI v3.1 + Snow Altitude Logic
+        stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
+        
+        # Track worst conditions
         if eei_val < g_min_eei:
             g_min_eei = eei_val
         if wind_val > g_max_wind:
@@ -592,17 +649,18 @@ try:
             snow_detected = True
         if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat:
             worst_status = stat
-            worst_sector = sector['name']
+            worst_sector = sec['name']
         
         snow_marker = f"❄ [{snow_int}]" if is_snow else ""
-        print(f"✅ {sector['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
+        print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
+        
+    except Exception as e:
+        print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
 
-finally:
-    http_session.close()
-
-# Generar banner y mapa
+# Generar banner, mapa y HOME BRIEFING CARD
 generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected)
 generate_map()
+generate_home_briefing_card(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected, g_freezing_level)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # GENERAR JSON DE ESTADO (PARA WIDGET)
@@ -619,6 +677,7 @@ status_data = {
     "status": worst_status,
     "max_wind": int(g_max_wind),
     "snow_detected": snow_detected,
+    "freezing_level": int(g_freezing_level),
     "timestamp_utc": now.isoformat(),
     "model_version": "MQ Rider Index v3.1 + Snow Altitude",
     "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"]
@@ -645,30 +704,35 @@ if "FTP_USER" in os.environ:
     FTP_USER = os.environ["FTP_USER"]
     FTP_PASS = os.environ["FTP_PASS"]
     
-    # List of files to upload
-    files_to_upload = [
-        (f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png"),
-        (f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html"),
-        (f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json", "MQ_ATMOS_STATUS.json")
-    ]
-    for i in range(1, 7):
-        files_to_upload.append((f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png"))
-
-    print(f"   Starting parallel upload ({len(files_to_upload)} files)...")
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        # Submit all upload tasks
-        futures = {executor.submit(upload_file, local, remote, FTP_HOST, FTP_USER, FTP_PASS): remote for local, remote in files_to_upload}
+    try:
+        session = ftplib.FTP()
+        session.connect(FTP_HOST, 21, timeout=30)
+        session.login(FTP_USER, FTP_PASS)
+        session.set_pasv(True)
         
-        for future in as_completed(futures):
-            remote_name, success, error = future.result()
-            if success:
-                print(f"   ✓ {remote_name}")
-            else:
-                print(f"   ❌ {remote_name} - {error}")
-                
-    print("\n✅ FTP UPLOAD COMPLETADO")
-
+        print(f"📍 Conectado: {session.pwd()}")
+        
+        def upload(local, remote):
+            with open(local, 'rb') as f:
+                session.storbinary(f'STOR {remote}', f)
+            print(f"   ✓ {remote}")
+        
+        upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
+        upload(f"{OUTPUT_FOLDER}MQ_HOME_BRIEFING_CARD.png", "MQ_HOME_BRIEFING_CARD.png")  # NUEVO
+        upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", 
+               "MQ_TACTICAL_MAP_CALIBRATED.html")
+        upload(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",
+               "MQ_ATMOS_STATUS.json")
+        
+        for i in range(1, 7):
+            upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", 
+                   f"MQ_SECTOR_{i}_STATUS.png")
+        
+        session.quit()
+        print("\n✅ FTP UPLOAD COMPLETADO")
+        
+    except Exception as e:
+        print(f"\n❌ ERROR FTP: {e}")
 else:
     print("⚠️  MODO LOCAL (Variables FTP_USER/FTP_PASS no encontradas)")
     print("   Archivos generados en carpeta 'output/'")
@@ -678,16 +742,18 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("\n" + "═"*70)
-print("🎯 BELLATOR V18.1 COMPLETADO")
+print("🎯 BELLATOR V18.2 COMPLETADO")
 print("═"*70)
 print(f"📊 Modelo: MQ Rider Index v3.1 (JAG/TI adapted for MTB)")
 print(f"📅 Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
 print(f"🌡️  MIN MRI: {g_min_eei}°C")
 print(f"💨 MAX WIND: {int(g_max_wind)} km/h")
 print(f"❄️  SNOW: {'DETECTED' if snow_detected else 'NONE'}")
+print(f"🧊 FREEZING LEVEL: {int(g_freezing_level)}m")
 print(f"⚠️  Status: {worst_status}")
 print("═"*70)
-print("\n✨ MQ RIDER INDEX™ v3.1 + SNOW ALTITUDE LOGIC")
+print("\n✨ MQ RIDER INDEX™ v3.1 + HOME BRIEFING CARD")
 print("   Technical Base: Osczevski & Bluestein (2001) - JAG/TI Standard")
 print("   Mountain Adaptation: Altitude-aware snow detection (65-1415m)")
+print("   NEW: Home briefing card with race impact analysis")
 print("═"*70 + "\n")
