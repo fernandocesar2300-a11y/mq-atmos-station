@@ -1,13 +1,13 @@
 """
 ═══════════════════════════════════════════════════════════════════════════
-MQ ATMOS LAB: BELLATOR V18.1 (EEI v3.1 + SNOW ALTITUDE)
+MQ ATMOS LAB: BELLATOR V18.2 (SURGICAL FIXES - SNOW PHYSICS)
 ═══════════════════════════════════════════════════════════════════════════
 
-CHANGELOG V18.1:
-✅ CRITICAL FIX: Detección de nieve basada en cota vs altitud de sector
-✅ Añadido snowfall y freezing_level_height desde Open-Meteo
-✅ Alertas de nieve calibradas para Serra do Marão (800-1415m)
-✅ Lógica mountain-aware para precipitación mixta
+CHANGELOG V18.2 (SURGICAL):
+✅ FIX 1: Detección de nieve SOLO por física básica (ignora weathercode/snowfall)
+✅ FIX 2: Zona gris 0-3°C para precipitación mixta
+✅ FIX 3: Boost viento +60% total en sectores >1000m (ridge acceleration)
+✅ FIX 4: Validación local de freezing_level (corrección si delta >500m)
 
 MODELO:
 EEI = T_wc - P_wet + G_sol
@@ -28,7 +28,7 @@ import ftplib
 import folium
 import math
 
-print("📡 INICIANDO SISTEMA V18.1 (EEI v3.1 + SNOW ALTITUDE)...")
+print("📡 INICIANDO SISTEMA V18.2 (SURGICAL FIXES - SNOW PHYSICS)...")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO EEI v3.1 (EMBEBIDO)
@@ -220,12 +220,12 @@ def get_weather_text(code):
     return "OVCAST"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# GENERADOR DE TARJETAS (CON EEI v3.1 + SNOW ALTITUDE LOGIC)
+# GENERADOR DE TARJETAS (CON SURGICAL FIXES)
 # ═══════════════════════════════════════════════════════════════════════════
 
 def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     """
-    Genera tarjeta de sector usando EEI v3.1 + Snow Altitude Detection
+    Genera tarjeta de sector con SURGICAL FIXES para detección de nieve
     """
     now_ts = datetime.datetime.utcnow()
     
@@ -248,40 +248,65 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
         sector['lat'], sector['lon'], now_ts + datetime.timedelta(hours=6)
     )
     
-    # Estado y color
+    # Estado y color base
     status = estado_now['nivel']
     color = estado_now['color']
     
-    # Detección de nieve basada en ALTITUD vs COTA
+    # ═══════════════════════════════════════════════════════════════════════
+    # SURGICAL FIX #1: DETECCIÓN DE NIEVE - SOLO FÍSICA BÁSICA
+    # ═══════════════════════════════════════════════════════════════════════
+    
     is_snow = False
     snow_intensity = "LIGHT"
+    is_mixed = False
     
-    # Condición 1: Altitud del sector está SOBRE la cota de nieve
-    if sector['altitude_m'] > data_now['freezing_level']:
+    # ZONA GRIS: 0-3°C con precipitación (FIX #2)
+    if 0 < data_now['temp'] <= 3 and data_now['rain'] > 0.1:
+        is_mixed = True
+        if data_now['temp'] <= 1.5:
+            status = "LIKELY SNOW"
+            color = "#3498db"
+            watermark_base = "SNOW PROBABLE"
+        else:  # 1.5-3°C
+            status = "MIXED PRECIP"
+            color = "#e67e22"
+            watermark_base = "RAIN/SNOW MIX"
+    
+    # REGLA 1: Si hay precipitación Y temp ≤ 1°C → NIEVE (siempre)
+    elif data_now['rain'] > 0.1 and data_now['temp'] <= 1:
         is_snow = True
-        
-    # Condición 2: Weathercode indica nieve (backup)
-    if data_now['code'] in [71, 73, 75, 77, 85, 86]:
-        is_snow = True
-        
-    # Condición 3: Hay snowfall activo
-    if data_now['snowfall'] > 0.1:
-        is_snow = True
-        if data_now['snowfall'] > 1.0:
-            snow_intensity = "MODERATE"
-        if data_now['snowfall'] > 5.0:
+        if data_now['rain'] > 10:
             snow_intensity = "HEAVY"
+        elif data_now['rain'] > 3:
+            snow_intensity = "MODERATE"
+        else:
+            snow_intensity = "LIGHT"
     
+    # REGLA 2: Si altitud > freezing_level (y dato válido)
+    elif sector['altitude_m'] > data_now['freezing_level'] and data_now['freezing_level'] < 9000:
+        if data_now['rain'] > 0.1:
+            is_snow = True
+            if data_now['rain'] > 10:
+                snow_intensity = "HEAVY"
+            elif data_now['rain'] > 3:
+                snow_intensity = "MODERATE"
+            else:
+                snow_intensity = "LIGHT"
+    
+    # Override status si nieve confirmada
     if is_snow:
         if snow_intensity == "LIGHT":
             status = "SNOW ALERT"
             color = "#f1c40f"
+            watermark_base = "❄"
         elif snow_intensity == "MODERATE":
             status = "SNOW WARNING"
             color = "#e67e22"
-        else:
+            watermark_base = "SNOW"
+        else:  # HEAVY
             status = "BLIZZARD"
             color = "#e74c3c"
+            watermark_base = "BLIZZARD"
     
     # Flechas de tendencia
     def get_arrow(curr, fut):
@@ -310,9 +335,8 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
             color='#94a3b8', fontsize=8, fontweight='bold', transform=ax.transAxes)
     
     # Watermark
-    if is_snow:
-        watermark_text = "❄" if snow_intensity == "LIGHT" else "SNOW"
-        plt.text(0.5, 0.40, watermark_text, color='white', alpha=0.10, 
+    if is_snow or is_mixed:
+        plt.text(0.5, 0.40, watermark_base, color='white', alpha=0.10, 
                 fontsize=55, fontweight='bold', ha='center', transform=ax.transAxes)
     else:
         plt.text(0.08, 0.40, get_weather_text(data_now['code']), 
@@ -343,15 +367,24 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.plot([0.05, 0.95], [0.15, 0.15], color='#334155', 
             linewidth=1, transform=ax.transAxes)
     
-    # Forecast con lógica altitud para nieve
-    def get_precip_type(code, temp, alt, frz):
-        if code < 51: return get_weather_text(code)
-        if alt > frz or temp <= 1: 
-            if code in [71,73,75,77,85,86] or alt > frz: return "SNOW"
-        return get_weather_text(code)
+    # Forecast con física de nieve
+    def get_precip_type(d, alt):
+        # Zona gris
+        if 0 < d['temp'] <= 3 and d['rain'] > 0.1:
+            if d['temp'] <= 1.5:
+                return "SNOW?"
+            else:
+                return "MIXED"
+        # Nieve confirmada
+        elif d['temp'] <= 1 and d['rain'] > 0.1:
+            return "SNOW"
+        elif alt > d['freezing_level'] and d['freezing_level'] < 9000 and d['rain'] > 0.1:
+            return "SNOW"
+        else:
+            return get_weather_text(d['code'])
     
-    f_3h_type = get_precip_type(data_3h['code'], data_3h['temp'], sector['altitude_m'], data_3h['freezing_level'])
-    f_6h_type = get_precip_type(data_6h['code'], data_6h['temp'], sector['altitude_m'], data_6h['freezing_level'])
+    f_3h_type = get_precip_type(data_3h, sector['altitude_m'])
+    f_6h_type = get_precip_type(data_6h, sector['altitude_m'])
     
     f_3h = f"+3H: {f_3h_type} {int(data_3h['temp'])}° {arrow_3h}"
     f_6h = f"+6H: {f_6h_type} {int(data_6h['temp'])}° {arrow_6h}"
@@ -370,7 +403,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
                 dpi=150, facecolor='#0f172a')
     plt.close()
     
-    return status, int(eei_now), data_now['wind'], is_snow, snow_intensity
+    return status, int(eei_now), data_now['wind'], is_snow or is_mixed, snow_intensity
 
 # ═══════════════════════════════════════════════════════════════════════════
 # BANNER PRINCIPAL
@@ -383,7 +416,7 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str,
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     color = "#2ecc71"
-    if "ALERT" in status or "SNOW" in status: 
+    if "ALERT" in status or "SNOW" in status or "MIXED" in status or "LIKELY" in status: 
         color = "#f1c40f"
     if "WARNING" in status:
         color = "#e67e22"
@@ -416,7 +449,7 @@ def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str,
         sub = f"UPDATED: {time_str} UTC | MQ RIDER INDEX™"
     elif snow_detected:
         hook = f"SNOW ALERT: {worst_sector}"
-        sub = f"UPDATED: {time_str} UTC | ALTITUDE-AWARE SYSTEM"
+        sub = f"UPDATED: {time_str} UTC | PHYSICS-BASED DETECTION"
     else:
         hook = f"WARNING: {worst_sector}"
         sub = f"UPDATED: {time_str} UTC | MQ RIDER INDEX™"
@@ -507,10 +540,32 @@ for sec in sectors:
         d_3h = get_data(current_hour + 3)
         d_6h = get_data(current_hour + 6)
         
-        # Ajuste altitud
+        # ═══════════════════════════════════════════════════════════════════
+        # SURGICAL FIX #4: VALIDAR FREEZING LEVEL LOCALMENTE
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # Calcular freezing level esperado basado en temperatura
+        if d_now['temp'] != 0:  # Evitar división por cero
+            expected_fl = sec['altitude_m'] + (d_now['temp'] / 0.0065)
+            
+            # Si el API difiere >500m, usar el calculado
+            if abs(d_now['freezing_level'] - expected_fl) > 500:
+                delta = d_now['freezing_level'] - expected_fl
+                print(f"⚠️  {sec['name']:20} | FL API={int(d_now['freezing_level'])}m, "
+                      f"Expected={int(expected_fl)}m, Delta={int(delta):+d}m → CORRECTED")
+                d_now['freezing_level'] = expected_fl
+                d_3h['freezing_level'] = expected_fl  # Aplicar a forecast también
+                d_6h['freezing_level'] = expected_fl
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # SURGICAL FIX #3: BOOST VIENTO +60% EN SECTORES >1000m
+        # ═══════════════════════════════════════════════════════════════════
+        
         if sec['altitude_m'] > 1000:
-            d_now['wind'] *= 1.35
+            wind_original = d_now['wind']
+            d_now['wind'] *= 1.60  # ERA 1.35, AHORA 1.60 (ridge acceleration +30%)
             d_now['temp'] -= 2
+            print(f"🌬️  {sec['name']:20} | Wind: {wind_original:.1f} → {d_now['wind']:.1f} km/h (+60%)")
         
         # Generar tarjeta
         stat, eei_val, wind_val, is_snow, snow_int = generate_ui_card(sec, d_now, d_3h, d_6h, time_str)
@@ -522,7 +577,7 @@ for sec in sectors:
             g_max_wind = wind_val
         if is_snow:
             snow_detected = True
-        if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat:
+        if "ALERT" in stat or "SNOW" in stat or "WARNING" in stat or "MIXED" in stat or "LIKELY" in stat:
             worst_status = stat
             worst_sector = sec['name']
         
@@ -552,8 +607,14 @@ status_data = {
     "max_wind": int(g_max_wind),
     "snow_detected": snow_detected,
     "timestamp_utc": now.isoformat(),
-    "model_version": "MQ Rider Index v3.1 + Snow Altitude",
-    "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"]
+    "model_version": "MQ Rider Index v3.1 + Snow Physics",
+    "data_sources": ["ECMWF", "Copernicus", "NOAA GFS"],
+    "surgical_fixes": [
+        "Physics-based snow detection (ignores weathercode/snowfall)",
+        "Mixed precipitation zone 0-3°C",
+        "Ridge acceleration +60% wind boost >1000m",
+        "Local freezing level validation"
+    ]
 }
 
 try:
@@ -614,7 +675,7 @@ else:
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("\n" + "═"*70)
-print("🎯 BELLATOR V18.1 COMPLETADO")
+print("🎯 BELLATOR V18.2 SURGICAL FIXES COMPLETADO")
 print("═"*70)
 print(f"📊 Modelo: MQ Rider Index v3.1 (JAG/TI adapted for MTB)")
 print(f"📅 Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
@@ -623,7 +684,9 @@ print(f"💨 MAX WIND: {int(g_max_wind)} km/h")
 print(f"❄️  SNOW: {'DETECTED' if snow_detected else 'NONE'}")
 print(f"⚠️  Status: {worst_status}")
 print("═"*70)
-print("\n✨ MQ RIDER INDEX™ v3.1 + SNOW ALTITUDE LOGIC")
-print("   Technical Base: Osczevski & Bluestein (2001) - JAG/TI Standard")
-print("   Mountain Adaptation: Altitude-aware snow detection (65-1415m)")
+print("\n✨ SURGICAL FIXES IMPLEMENTED:")
+print("   ✅ FIX #1: Physics-based snow detection (no weathercode/snowfall)")
+print("   ✅ FIX #2: Mixed precip zone 0-3°C with sub-classification")
+print("   ✅ FIX #3: Ridge acceleration +60% wind boost (>1000m)")
+print("   ✅ FIX #4: Local freezing level validation (±500m threshold)")
 print("═"*70 + "\n")
