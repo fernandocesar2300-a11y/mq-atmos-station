@@ -351,9 +351,18 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     plt.plot([0.05, 0.95], [0.15, 0.15], color='#334155', 
             linewidth=1, transform=ax.transAxes)
     
-    # Forecast
-    f_3h = f"+3H: {get_weather_text(data_3h['code'])} {int(data_3h['temp'])}° {arrow_3h}"
-    f_6h = f"+6H: {get_weather_text(data_6h['code'])} {int(data_6h['temp'])}° {arrow_6h}"
+    # Forecast (con lógica altitud para nieve)
+    def get_precip_type(code, temp, alt, frz):
+        if code < 51: return get_weather_text(code)
+        if alt > frz or temp <= 1: 
+            if code in [71,73,75,77,85,86] or alt > frz: return "SNOW"
+        return get_weather_text(code)
+    
+    f_3h_type = get_precip_type(data_3h['code'], data_3h['temp'], sector['altitude_m'], data_3h['freezing_level'])
+    f_6h_type = get_precip_type(data_6h['code'], data_6h['temp'], sector['altitude_m'], data_6h['freezing_level'])
+    
+    f_3h = f"+3H: {f_3h_type} {int(data_3h['temp'])}° {arrow_3h}"
+    f_6h = f"+6H: {f_6h_type} {int(data_6h['temp'])}° {arrow_6h}"
     plt.text(0.05, 0.09, f_3h, color='#94a3b8', fontsize=9, 
             fontweight='bold', ha='left', transform=ax.transAxes)
     plt.text(0.95, 0.09, f_6h, color='#94a3b8', fontsize=9, 
