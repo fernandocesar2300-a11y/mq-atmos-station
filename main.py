@@ -27,6 +27,7 @@ import os
 import ftplib
 import folium
 import math
+import concurrent.futures
 
 print("📡 INICIANDO SISTEMA V18.2 (SURGICAL FIXES - SNOW PHYSICS)...")
 
@@ -519,11 +520,23 @@ g_min_eei = 99
 g_max_wind = 0
 snow_detected = False
 
-for sec in sectors:
+def fetch_weather_data(sec):
     try:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
         r = requests.get(url, timeout=10).json()
-        
+        return r, None
+    except Exception as e:
+        return None, e
+
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    results = executor.map(fetch_weather_data, sectors)
+
+for sec, (r, error) in zip(sectors, results):
+    if error:
+        print(f"❌ {sec['name']:20} | Error: {str(error)[:50]}")
+        continue
+
+    try:
         def get_data(h):
             return {
                 'temp': r['hourly']['temperature_2m'][h],

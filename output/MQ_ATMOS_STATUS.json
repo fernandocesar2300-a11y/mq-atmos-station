@@ -1,0 +1,16 @@
+{
+  "last_update": "08:52",
+  "alert_level": "SNOW ALERT",
+  "min_mri": -8,
+  "worst_sector": "SERRA DO MAR\u00c3O",
+  "status": "SNOW ALERT",
+  "max_wind": 12,
+  "snow_detected": true,
+  "timestamp_utc": "2025-12-24T08:52:57.712653",
+  "model_version": "MQ Rider Index v3.1 + Snow Altitude",
+  "data_sources": [
+    "ECMWF",
+    "Copernicus",
+    "NOAA GFS"
+  ]
+}
