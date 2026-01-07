@@ -27,6 +27,7 @@ import os
 import ftplib
 import folium
 import math
+import concurrent.futures
 
 print("📡 INICIANDO SISTEMA V18.2 (SURGICAL FIXES - SNOW PHYSICS)...")
 
@@ -320,7 +321,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
     
     # GENERAR TARJETA
     fig, ax = plt.subplots(figsize=(6, 3.4), facecolor='#0f172a')
-    ax.set_facecolor='#0f172a'
+    ax.set_facecolor('#0f172a')
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     # Barra lateral
@@ -412,7 +413,7 @@ def generate_ui_card(sector, data_now, data_3h, data_6h, time_str):
 def generate_dashboard_banner(status, min_eei, max_wind, worst_sector, time_str, snow_detected):
     """Genera banner principal"""
     fig, ax = plt.subplots(figsize=(8, 2.5), facecolor='#0a0a0a')
-    ax.set_facecolor='#0a0a0a'
+    ax.set_facecolor('#0a0a0a')
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
     color = "#2ecc71"
@@ -508,8 +509,9 @@ def generate_map():
 # EJECUCIÓN PRINCIPAL
 # ═══════════════════════════════════════════════════════════════════════════
 
-print("🚀 OBTENIENDO DATOS OPEN-METEO...")
-now = datetime.datetime.now()
+print("🚀 OBTENIENDO DATOS OPEN-METEO (PARALLEL)...")
+# Standardize to UTC as requested
+now = datetime.datetime.utcnow()
 time_str = now.strftime("%H:%M")
 current_hour = now.hour
 
@@ -519,26 +521,48 @@ g_min_eei = 99
 g_max_wind = 0
 snow_detected = False
 
-for sec in sectors:
+def fetch_sector_data_worker(sec):
+    """Worker para descargar datos de un sector"""
     try:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={sec['lat']}&longitude={sec['lon']}&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,relativehumidity_2m,global_tilted_irradiance,snowfall,freezing_level_height&forecast_days=2"
         r = requests.get(url, timeout=10).json()
+        return (sec, r, None)
+    except Exception as e:
+        return (sec, None, str(e))
+
+fetched_results = []
+# Parallel Fetch
+with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+    future_to_sec = {executor.submit(fetch_sector_data_worker, s): s for s in sectors}
+    for future in concurrent.futures.as_completed(future_to_sec):
+        fetched_results.append(future.result())
+
+# Sequential Processing (Chart Generation)
+for sec, r, error in fetched_results:
+    if error:
+        print(f"❌ {sec['name']:20} | Fetch Error: {error[:50]}")
+        continue
         
-        def get_data(h):
+    try:
+        def get_data(h, source_data):
+            # Safe access with fallback
+            limit = len(source_data['hourly']['temperature_2m']) - 1
+            h_safe = min(h, limit)
+
             return {
-                'temp': r['hourly']['temperature_2m'][h],
-                'wind': r['hourly']['windspeed_10m'][h],
-                'rain': r['hourly']['precipitation'][h],
-                'hum': r['hourly']['relativehumidity_2m'][h],
-                'code': r['hourly']['weathercode'][h],
-                'irradiance': r['hourly'].get('global_tilted_irradiance', [0]*48)[h],
-                'snowfall': r['hourly'].get('snowfall', [0]*48)[h],
-                'freezing_level': r['hourly'].get('freezing_level_height', [9999]*48)[h]
+                'temp': source_data['hourly']['temperature_2m'][h_safe],
+                'wind': source_data['hourly']['windspeed_10m'][h_safe],
+                'rain': source_data['hourly']['precipitation'][h_safe],
+                'hum': source_data['hourly']['relativehumidity_2m'][h_safe],
+                'code': source_data['hourly']['weathercode'][h_safe],
+                'irradiance': source_data['hourly'].get('global_tilted_irradiance', [0]*(limit+1))[h_safe],
+                'snowfall': source_data['hourly'].get('snowfall', [0]*(limit+1))[h_safe],
+                'freezing_level': source_data['hourly'].get('freezing_level_height', [9999]*(limit+1))[h_safe]
             }
         
-        d_now = get_data(current_hour)
-        d_3h = get_data(current_hour + 3)
-        d_6h = get_data(current_hour + 6)
+        d_now = get_data(current_hour, r)
+        d_3h = get_data(current_hour + 3, r)
+        d_6h = get_data(current_hour + 6, r)
         
         # ═══════════════════════════════════════════════════════════════════
         # SURGICAL FIX #4: VALIDAR FREEZING LEVEL LOCALMENTE
@@ -585,7 +609,7 @@ for sec in sectors:
         print(f"✅ {sec['name']:20} | MRI: {eei_val:3d}°C {snow_marker}")
         
     except Exception as e:
-        print(f"❌ {sec['name']:20} | Error: {str(e)[:50]}")
+        print(f"❌ {sec['name']:20} | Processing Error: {str(e)[:50]}")
 
 # Generar banner y mapa
 generate_dashboard_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected)
@@ -625,47 +649,75 @@ except Exception as e:
     print(f"⚠️  Error generando JSON: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════
-# FTP UPLOAD
+# FTP UPLOAD (PARALLEL)
 # ═══════════════════════════════════════════════════════════════════════════
 
 print("\n" + "─"*70)
-print("🚀 SUBIENDO A FTP...")
+print("🚀 SUBIENDO A FTP (PARALLEL)...")
 print("─"*70)
 
 FTP_HOST = "ftp.nexplore.pt"
 
+def upload_file_worker(args):
+    """Worker para subir un archivo individual"""
+    local_path, remote_filename, ftp_host, ftp_user, ftp_pass = args
+    try:
+        session = ftplib.FTP()
+        session.connect(ftp_host, 21, timeout=30)
+        session.login(ftp_user, ftp_pass)
+        session.set_pasv(True)
+        
+        with open(local_path, 'rb') as f:
+            session.storbinary(f'STOR {remote_filename}', f)
+        
+        session.quit()
+        return (remote_filename, True, None)
+    except Exception as e:
+        return (remote_filename, False, str(e))
+
 if "FTP_USER" in os.environ:
     FTP_USER = os.environ["FTP_USER"]
     FTP_PASS = os.environ["FTP_PASS"]
-    
-    try:
-        session = ftplib.FTP()
-        session.connect(FTP_HOST, 21, timeout=30)
-        session.login(FTP_USER, FTP_PASS)
-        session.set_pasv(True)
-        
-        print(f"📍 Conectado: {session.pwd()}")
-        
-        def upload(local, remote):
-            with open(local, 'rb') as f:
-                session.storbinary(f'STOR {remote}', f)
-            print(f"   ✓ {remote}")
-        
-        upload(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png")
-        upload(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", 
-               "MQ_TACTICAL_MAP_CALIBRATED.html")
-        upload(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",
-               "MQ_ATMOS_STATUS.json")
-        
-        for i in range(1, 7):
-            upload(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", 
-                   f"MQ_SECTOR_{i}_STATUS.png")
-        
-        session.quit()
-        print("\n✅ FTP UPLOAD COMPLETADO")
-        
-    except Exception as e:
-        print(f"\n❌ ERROR FTP: {e}")
+
+    files_to_upload = []
+
+    # 1. Banner
+    files_to_upload.append((f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png", "MQ_HOME_BANNER.png", FTP_HOST, FTP_USER, FTP_PASS))
+
+    # 2. Map
+    files_to_upload.append((f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html", FTP_HOST, FTP_USER, FTP_PASS))
+
+    # 3. JSON
+    files_to_upload.append((f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json", "MQ_ATMOS_STATUS.json", FTP_HOST, FTP_USER, FTP_PASS))
+
+    # 4. Sector cards
+    for i in range(1, 7):
+        files_to_upload.append((f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png", FTP_HOST, FTP_USER, FTP_PASS))
+
+    print(f"📡 Iniciando subida paralela ({len(files_to_upload)} archivos, 4 workers)...")
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_file = {executor.submit(upload_file_worker, f): f for f in files_to_upload}
+        for future in concurrent.futures.as_completed(future_to_file):
+            results.append(future.result())
+            remote_name, success, _ = future.result()
+            if success:
+                print(f"   ✓ {remote_name}")
+            else:
+                print(f"   ❌ {remote_name}")
+
+    success_count = sum(1 for r in results if r[1])
+    fail_count = sum(1 for r in results if not r[1])
+
+    print(f"\n✅ FTP SUMMARY: {success_count}/{len(files_to_upload)} Succeeded, {fail_count} Failed")
+
+    if fail_count > 0:
+        print("\n❌ ERRORES DETALLADOS:")
+        for fname, success, error in results:
+            if not success:
+                print(f"   - {fname}: {error}")
+
 else:
     print("⚠️  MODO LOCAL (Variables FTP_USER/FTP_PASS no encontradas)")
     print("   Archivos generados en carpeta 'output/'")
