@@ -1,31 +1,39 @@
 name: Actualizar MQ Atmos
-
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Cada 10 minutos (como V19.0)
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Verificar Python pre-instalado
         run: |
           python3 --version
           pip --version
-      
+
       - name: Instalar dependencias
         run: |
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Ejecutar ATMOS V19.0
         env:
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
         run: |
           python3 main.py
+
+      - name: Keep-alive commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "last_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .last_run
+          git add .last_run
+          git diff --cached --quiet || git commit -m "chore: keep-alive $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
