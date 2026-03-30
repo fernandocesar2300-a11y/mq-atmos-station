@@ -1,0 +1,32 @@
+name: IPMA Calibration
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install requests
+
+      - name: Ejecutar IPMA Calibration
+        run: |
+          python3 ipma_calibration.py
+
+      - name: Commit aemet_corrections.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add aemet_corrections.json
+          git diff --cached --quiet || git commit -m "chore: ipma calibration $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
