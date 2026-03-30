@@ -4,24 +4,23 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
-
       - name: Verificar Python pre-instalado
         run: |
           python3 --version
           pip --version
-
       - name: Instalar dependencias
         run: |
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Ejecutar ATMOS V19.1
         env:
           FTP_USER: ${{ secrets.FTP_USER }}
@@ -30,7 +29,6 @@ jobs:
           NASA_EARTHDATA_TOKEN: ${{ secrets.NASA_EARTHDATA_TOKEN }}
         run: |
           python3 main.py
-
       - name: Keep-alive commit
         run: |
           git config user.name "github-actions[bot]"
