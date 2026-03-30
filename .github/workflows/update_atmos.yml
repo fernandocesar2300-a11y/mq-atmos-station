@@ -22,10 +22,12 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ejecutar ATMOS V19.0
+      - name: Ejecutar ATMOS V19.1
         env:
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
+          AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
+          NASA_EARTHDATA_TOKEN: ${{ secrets.NASA_EARTHDATA_TOKEN }}
         run: |
           python3 main.py
 
