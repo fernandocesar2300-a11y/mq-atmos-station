@@ -1,20 +1,35 @@
 """
-MQ ATMOS LAB: BELLATOR V20.0
-Convección, granizo y trovoada correctamente señalizados.
+MQ ATMOS LAB — BELLATOR V20.0
+CONVECTION + LIGHTNING UPDATE
+
+CHANGELOG V20.0 vs V19.1:
+✅ lightning_potential field from Open-Meteo (real-time %)
+✅ convective_inhibition (CIN) field — suppression factor
+✅ AEMET storm alerts — TIER 0 override
+✅ evaluar_conveccion() — priority override above EEI
+✅ Language: English / Portuguese. No Spanish.
+✅ urllib fallback if requests DNS fails
 """
 
 import gpxpy, gpxpy.gpx
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import requests, datetime, os, ftplib, folium, math, json
+import requests
+import datetime, os, ftplib, folium, math, json, time, re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-import time
+import xml.etree.ElementTree as ET
 
-print("📡 BELLATOR V20.0...")
+print("📡 MQ ATMOS BELLATOR V20.0 — CONVECTION UPDATE")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CREDENTIALS
+# ─────────────────────────────────────────────────────────────────────────────
 NASA_EARTHDATA_TOKEN = os.environ.get("NASA_EARTHDATA_TOKEN", "")
-AEMET_API_KEY = os.environ.get("AEMET_API_KEY", "")
+AEMET_API_KEY        = os.environ.get("AEMET_API_KEY", "")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AEMET FRESHNESS CHECK
+# ─────────────────────────────────────────────────────────────────────────────
 def check_aemet_freshness():
     try:
         with open('aemet_corrections.json') as f:
@@ -22,26 +37,83 @@ def check_aemet_freshness():
         for _, sd in data.items():
             if 'last_update' in sd:
                 age = datetime.datetime.utcnow() - datetime.datetime.fromisoformat(sd['last_update'])
-                h = age.total_seconds() / 3600
+                h   = age.total_seconds() / 3600
                 if age > datetime.timedelta(hours=48):
-                    return {}, f"⚠️  AEMET >48h ({h:.0f}h) - DESACTIVADO"
+                    return {}, f"⚠️  AEMET corrections >48h ({h:.0f}h) — DISABLED"
                 elif age > datetime.timedelta(hours=24):
-                    return data, f"⚠️  AEMET >24h ({h:.0f}h) - degradado"
+                    return data, f"⚠️  AEMET corrections >24h ({h:.0f}h) — degraded"
                 else:
-                    return data, f"✅ AEMET OK ({h:.0f}h)"
-        return data, "⚠️  AEMET sin timestamp"
+                    return data, f"✅ AEMET corrections OK ({h:.0f}h)"
+        return data, "⚠️  AEMET corrections: no timestamp"
     except FileNotFoundError:
-        return {}, "⚠️  aemet_corrections.json no encontrado"
+        return {}, "⚠️  aemet_corrections.json not found — run aemet_calibration.py"
     except Exception as e:
         return {}, f"⚠️  AEMET error: {str(e)[:50]}"
 
 aemet_corrections, aemet_status = check_aemet_freshness()
 print(aemet_status)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# EEI v3.1 — INTACTO
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
+# AEMET STORM ALERTS — TIER 0
+# Queries active CAP warnings for NW Iberia (area 61 = Norte)
+# Returns list of active storm sectors
+# ─────────────────────────────────────────────────────────────────────────────
+def check_aemet_storm_alerts():
+    """
+    Returns (alert_active: bool, alert_text: str, severity: str)
+    Severity: 'Extreme' | 'Severe' | 'Moderate' | None
+    """
+    if not AEMET_API_KEY:
+        return False, "AEMET key not configured", None
+    try:
+        # Step 1: get URL of latest CAP file
+        r = requests.get(
+            "https://opendata.aemet.es/opendata/api/avisos_cap/ultimoelaborado/area/61",
+            params={"api_key": AEMET_API_KEY},
+            timeout=8
+        )
+        if r.status_code != 200:
+            return False, f"AEMET alerts HTTP {r.status_code}", None
 
+        meta = r.json()
+        data_url = meta.get("datos")
+        if not data_url:
+            return False, "AEMET no data URL", None
+
+        # Step 2: fetch CAP XML
+        r2 = requests.get(data_url, timeout=10)
+        if r2.status_code != 200:
+            return False, f"AEMET CAP HTTP {r2.status_code}", None
+
+        # Step 3: parse CAP XML for storm events
+        root = ET.fromstring(r2.content)
+        ns   = {'cap': 'urn:oasis:names:tc:emergency:cap:1.2'}
+
+        storm_events  = []
+        max_severity  = None
+        severity_rank = {'Extreme': 4, 'Severe': 3, 'Moderate': 2, 'Minor': 1}
+
+        for alert in root.findall('.//cap:alert', ns):
+            for info in alert.findall('cap:info', ns):
+                event    = info.findtext('cap:event', '', ns)
+                severity = info.findtext('cap:severity', '', ns)
+                # Storm / thunder / lightning events
+                if any(k in event.lower() for k in ['storm','thunder','tormen','trovo','granizo','hail','electric','lightning']):
+                    storm_events.append(f"{event} ({severity})")
+                    if severity in severity_rank:
+                        if max_severity is None or severity_rank[severity] > severity_rank[max_severity]:
+                            max_severity = severity
+
+        if storm_events:
+            return True, f"AEMET ACTIVE: {', '.join(storm_events[:3])}", max_severity
+        return False, "AEMET: no storm warnings active", None
+
+    except Exception as e:
+        return False, f"AEMET alerts error: {str(e)[:60]}", None
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EEI v3.1 — UNCHANGED
+# ─────────────────────────────────────────────────────────────────────────────
 class EEI_v31:
     MU=0.6; V_RIDER=16; V_EFF_MIN=4.8; T_THRESHOLD=20
     LAMBDA_BASE=0.3; LAMBDA_HR=0.4; R_THRESHOLD=0.5; ALPHA=0.007
@@ -69,7 +141,7 @@ class EEI_v31:
         ha = (tst/4)-180
         se = (math.sin(math.radians(lat))*math.sin(math.radians(dec))+
               math.cos(math.radians(lat))*math.cos(math.radians(dec))*math.cos(math.radians(ha)))
-        return math.degrees(math.asin(se))
+        return math.degrees(math.asin(max(-1.0, min(1.0, se))))
 
     @staticmethod
     def calcular(T_a, v_meteo, HR, R_rate, I_sol, lat, lon, timestamp):
@@ -81,51 +153,75 @@ class EEI_v31:
         h_sol = EEI_v31.calcular_elevacion_solar(lat, lon, timestamp)
         G_sol = 0.0 if h_sol<=0 else I_sol*EEI_v31.ALPHA*math.sin(math.radians(h_sol))
         EEI   = T_wc-P_wet+G_sol
-        if EEI>15: estado={'nivel':'BUENAS CONDICIONES','color':'#2ecc71'}
-        elif EEI>10: estado={'nivel':'PRECAUCIÓN','color':'#f1c40f'}
-        elif EEI>5:  estado={'nivel':'ALERTA','color':'#e67e22'}
-        elif EEI>0:  estado={'nivel':'PELIGRO','color':'#e74c3c'}
-        else:        estado={'nivel':'CRÍTICO','color':'#8b0000'}
-        return round(EEI,1), {'T_wc':round(T_wc,1),'P_wet':round(P_wet,1),
-            'G_sol':round(G_sol,1),'h_sol':round(h_sol,1),'v_eff':round(v_eff,1)}, estado
+        if EEI>15:  estado={'nivel':'GOOD CONDITIONS', 'color':'#2ecc71'}
+        elif EEI>10: estado={'nivel':'CAUTION',         'color':'#f1c40f'}
+        elif EEI>5:  estado={'nivel':'WARNING',          'color':'#e67e22'}
+        elif EEI>0:  estado={'nivel':'DANGER',           'color':'#e74c3c'}
+        else:        estado={'nivel':'CRITICAL',         'color':'#8b0000'}
+        return round(EEI,1), {
+            'T_wc':round(T_wc,1),'P_wet':round(P_wet,1),
+            'G_sol':round(G_sol,1),'h_sol':round(h_sol,1),'v_eff':round(v_eff,1)
+        }, estado
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CAPA DE CONVECCIÓN — override prioritario sobre EEI
-# ═══════════════════════════════════════════════════════════════════════════
-
-def evaluar_conveccion(weathercode, cape, lifted_index):
+# ─────────────────────────────────────────────────────────────────────────────
+# CONVECTION LAYER — TIER 0 OVERRIDE
+# Priority: AEMET alert > lightning_potential > weathercode > CAPE+LI
+# ─────────────────────────────────────────────────────────────────────────────
+def evaluate_storm(weathercode, cape, lifted_index, cin, lightning_potential,
+                   aemet_active=False, aemet_severity=None):
     """
-    Retorna (status, color, nivel) o (None, None, 'NINGUNO').
-    Prioridad absoluta sobre EEI térmico.
-    Lenguaje: rider, no meteorólogo.
+    Returns (status, color, level) or (None, None, 'NONE').
+    Overrides EEI completely when active.
+    Language: English (displayed on rider-facing cards).
     """
-    cape = cape or 0
-    li   = lifted_index or 0
+    cape  = cape or 0
+    li    = lifted_index or 0
+    cin   = cin or 0
+    lp    = lightning_potential or 0  # 0.0–1.0 probability
 
-    # Granizo confirmado por modelo
+    # ── TIER 0-A: AEMET active storm warning ──
+    if aemet_active:
+        if aemet_severity == 'Extreme':
+            return "EXTREME STORM — DO NOT RIDE", "#4a0000", "EXTREME"
+        if aemet_severity in ['Severe', None]:
+            return "SEVERE STORM WARNING", "#8b0000", "SEVERE"
+        return "STORM WARNING — AEMET", "#c0392b", "HIGH"
+
+    # ── TIER 0-B: Hail confirmed by model ──
     if weathercode in [96, 99]:
-        return "GRANIZO — NO SALIR", "#4a0000", "EXTREMO"
+        return "HAIL — DO NOT RIDE", "#4a0000", "EXTREME"
 
-    # Tormenta eléctrica activa
+    # ── TIER 0-C: Active thunderstorm (weathercode) ──
     if 95 <= weathercode <= 99:
-        if cape > 2500:
-            return "TORMENTA SEVERA", "#8b0000", "SEVERO"
-        return "TORMENTA ELÉCTRICA", "#c0392b", "ALTO"
+        if cape > 2500 or lp > 0.5:
+            return "SEVERE THUNDERSTORM", "#8b0000", "SEVERE"
+        return "THUNDERSTORM", "#c0392b", "HIGH"
 
-    # Célula en desarrollo — sin código de tormenta todavía
-    if cape > 2500 and li < -3:
-        return "TORMENTA INMINENTE", "#8b0000", "SEVERO"
-    if cape > 1500 and li < -2:
-        return "TORMENTA PROBABLE", "#e74c3c", "MODERADO"
+    # ── TIER 0-D: Lightning potential (real-time model field) ──
+    # lightning_potential > 0.3 = significant lightning risk
+    if lp > 0.5:
+        return "LIGHTNING RISK — HIGH", "#8b0000", "SEVERE"
+    if lp > 0.3:
+        return "LIGHTNING RISK", "#e74c3c", "MODERATE"
+    if lp > 0.1:
+        return "LIGHTNING POSSIBLE", "#e67e22", "LOW"
+
+    # ── TIER 0-E: Developing cell (CAPE+LI, no weathercode yet) ──
+    # CIN > -50 J/kg means convection is NOT suppressed
+    cin_suppressed = cin < -200  # strong cap = suppressed
+    if not cin_suppressed:
+        if cape > 2500 and li < -4:
+            return "STORM IMMINENT", "#8b0000", "SEVERE"
+        if cape > 1500 and li < -2:
+            return "STORM PROBABLE", "#e74c3c", "MODERATE"
     if cape > 800:
-        return "INESTABILIDAD", "#e67e22", "BAJO"
+        return "ATMOSPHERIC INSTABILITY", "#e67e22", "LOW"
 
-    return None, None, "NINGUNO"
+    return None, None, "NONE"
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
-# ═══════════════════════════════════════════════════════════════════════════
-
+# ─────────────────────────────────────────────────────────────────────────────
 OUTPUT_FOLDER = 'output/'
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
@@ -138,8 +234,7 @@ try:
                 for s in t.segments:
                     for p in s.points:
                         track_points.append([p.latitude, p.longitude])
-except:
-    pass
+except: pass
 if not track_points:
     track_points = [[41.27,-8.08],[41.27,-8.08]]
 
@@ -152,16 +247,17 @@ sectors = [
     {"id":6,"name":"SRA. GRAÇA",      "lat":41.4168,"lon":-7.9106,"alt":"950m", "altitude_m":950, "type":"CLIMB",  "desc":"THE CLIMB"},
 ]
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
 # NASA POWER
-# ═══════════════════════════════════════════════════════════════════════════
-
+# ─────────────────────────────────────────────────────────────────────────────
 def get_nasa_irradiance(lat, lon, date):
     date_str = date.strftime('%Y%m%d')
     try:
-        r = requests.get("https://power.larc.nasa.gov/api/temporal/hourly/point",
+        r = requests.get(
+            "https://power.larc.nasa.gov/api/temporal/hourly/point",
             params={'parameters':'ALLSKY_SFC_SW_DWN','community':'RE',
-                    'longitude':lon,'latitude':lat,'start':date_str,'end':date_str,'format':'JSON'},
+                    'longitude':lon,'latitude':lat,
+                    'start':date_str,'end':date_str,'format':'JSON'},
             timeout=10)
         if r.status_code!=200: return None
         d = r.json()
@@ -186,28 +282,26 @@ def fetch_nasa_parallel(sectors, date):
             except: pass
     return cache
 
-# ═══════════════════════════════════════════════════════════════════════════
-# WEATHER TEXT — rider friendly
-# ═══════════════════════════════════════════════════════════════════════════
-
-def get_weather_text(code, temp, precip, snowfall):
+# ─────────────────────────────────────────────────────────────────────────────
+# WEATHER TEXT
+# ─────────────────────────────────────────────────────────────────────────────
+def weather_text(code, temp, precip, snowfall):
     if snowfall>0.1 or (temp<=2 and precip>0.5):
-        return "NIEVE INTENSA" if precip>10 else "NIEVE" if precip>3 else "NIEVE LIGERA"
-    if code==0: return "DESPEJADO"
-    if 1<=code<=3: return "NUBLADO"
-    if code in [45,48]: return "NIEBLA"
-    if 51<=code<=67: return "LLUVIA"
-    if code in [71,73,75,77,85,86]: return "NIEVE"
-    if 80<=code<=82: return "CHUBASCOS"
-    if code in [96,99]: return "GRANIZO"
-    if 95<=code<=99: return "TORMENTA"
-    return "CUBIERTO"
+        return "HEAVY SNOW" if precip>10 else "SNOW" if precip>3 else "LIGHT SNOW"
+    if code==0: return "CLEAR"
+    if 1<=code<=3: return "CLOUDY"
+    if code in [45,48]: return "FOG"
+    if 51<=code<=67: return "RAIN"
+    if code in [71,73,75,77,85,86]: return "SNOW"
+    if 80<=code<=82: return "SHOWERS"
+    if code in [96,99]: return "HAIL"
+    if 95<=code<=99: return "THUNDERSTORM"
+    return "OVERCAST"
 
-# ═══════════════════════════════════════════════════════════════════════════
-# MICROCLIMA
-# ═══════════════════════════════════════════════════════════════════════════
-
-def microclima(sector, data):
+# ─────────────────────────────────────────────────────────────────────────────
+# MICROCLIMATE
+# ─────────────────────────────────────────────────────────────────────────────
+def microclimate(sector, data):
     d   = data.copy()
     alt = sector['altitude_m']
     log = []
@@ -218,150 +312,168 @@ def microclima(sector, data):
         if c.get('wind_factor',1.0)!=1.0:
             w0=d['wind']; d['wind']*=c['wind_factor']; log.append(f"AEMET V {w0:.1f}→{d['wind']:.1f}")
     if alt>1000:
-        w0=d['wind']; d['wind']*=1.60; d['temp']-=2; log.append(f"Cresta +60%V ({w0:.1f}→{d['wind']:.1f})")
+        w0=d['wind']; d['wind']*=1.60; d['temp']-=2
+        log.append(f"Ridge +60%V ({w0:.1f}→{d['wind']:.1f})")
     if 400<alt<800:
-        d['temp']+=1.5; log.append("Valle +1.5°")
+        d['temp']+=1.5; log.append("Valley +1.5°")
     if alt<800 and d.get('hum',0)>85 and 8<=d.get('temp',0)<=12:
-        d['fog_alert']="NIEBLA"; log.append("Alerta niebla")
+        d['fog_alert']="NORTADA FOG"; log.append("Fog")
     if d.get('rain',0)>5:
-        d['mtb_hazard']="PISTA RESBALADIZA"; log.append("MTB hazard")
+        d['mtb_hazard']="SLIPPERY TRACK"; log.append("MTB hazard")
     if log: print(f"🔧 {sector['name']:20} | {' | '.join(log)}")
     return d
 
-# ═══════════════════════════════════════════════════════════════════════════
-# HOURLY DATA
-# ═══════════════════════════════════════════════════════════════════════════
-
+# ─────────────────────────────────────────────────────────────────────────────
+# HOURLY DATA — now includes lightning_potential + CIN
+# ─────────────────────────────────────────────────────────────────────────────
 def get_hourly(r, sec, h, nasa_cache):
     h = min(h, 47)
+    empty48 = [0]*48
     d = {
-        'temp':           r['hourly']['temperature_2m'][h],
-        'wind':           r['hourly']['windspeed_10m'][h],
-        'rain':           r['hourly']['precipitation'][h],
-        'hum':            r['hourly']['relativehumidity_2m'][h],
-        'code':           r['hourly']['weathercode'][h],
-        'irradiance':     r['hourly'].get('global_tilted_irradiance',[0]*48)[h],
-        'snowfall':       r['hourly'].get('snowfall',[0]*48)[h],
-        'freezing_level': r['hourly'].get('freezing_level_height',[9999]*48)[h],
-        'cape':           r['hourly'].get('cape',[0]*48)[h],
-        'lifted_index':   r['hourly'].get('lifted_index',[0]*48)[h],
+        'temp':               r['hourly']['temperature_2m'][h],
+        'wind':               r['hourly']['windspeed_10m'][h],
+        'rain':               r['hourly']['precipitation'][h],
+        'hum':                r['hourly']['relativehumidity_2m'][h],
+        'code':               r['hourly']['weathercode'][h],
+        'irradiance':         r['hourly'].get('global_tilted_irradiance', empty48)[h],
+        'snowfall':           r['hourly'].get('snowfall', empty48)[h],
+        'freezing_level':     r['hourly'].get('freezing_level_height', [9999]*48)[h],
+        'cape':               r['hourly'].get('cape', empty48)[h] or 0,
+        'lifted_index':       r['hourly'].get('lifted_index', empty48)[h] or 0,
+        'cin':                r['hourly'].get('convective_inhibition', empty48)[h] or 0,
+        'lightning_potential': r['hourly'].get('lightning_potential', [None]*48)[h],
     }
     if sec['id'] in nasa_cache and h<len(nasa_cache[sec['id']]):
         d['irradiance']=nasa_cache[sec['id']][h]; d['irradiance_source']='NASA_POWER'
     else:
         d['irradiance_source']='OPEN_METEO'
-    return microclima(sec, d)
+    return microclimate(sec, d)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CARD
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generate_card(sector, d_now, d_3h, d_6h, time_str):
+# ─────────────────────────────────────────────────────────────────────────────
+# CARD GENERATOR
+# ─────────────────────────────────────────────────────────────────────────────
+def generate_card(sector, d_now, d_3h, d_6h, time_str, aemet_active, aemet_severity):
     ts = datetime.datetime.utcnow()
-    eei_now, _, estado = EEI_v31.calcular(d_now['temp'],d_now['wind'],d_now['hum'],
-        d_now['rain'],d_now['irradiance'],sector['lat'],sector['lon'],ts)
-    eei_3h,_,_ = EEI_v31.calcular(d_3h['temp'],d_3h['wind'],d_3h['hum'],
-        d_3h['rain'],d_3h['irradiance'],sector['lat'],sector['lon'],ts+datetime.timedelta(hours=3))
-    eei_6h,_,_ = EEI_v31.calcular(d_6h['temp'],d_6h['wind'],d_6h['hum'],
-        d_6h['rain'],d_6h['irradiance'],sector['lat'],sector['lon'],ts+datetime.timedelta(hours=6))
+    eei_now, _, estado = EEI_v31.calcular(
+        d_now['temp'],d_now['wind'],d_now['hum'],d_now['rain'],
+        d_now['irradiance'],sector['lat'],sector['lon'],ts)
+    eei_3h,_,_ = EEI_v31.calcular(
+        d_3h['temp'],d_3h['wind'],d_3h['hum'],d_3h['rain'],
+        d_3h['irradiance'],sector['lat'],sector['lon'],ts+datetime.timedelta(hours=3))
+    eei_6h,_,_ = EEI_v31.calcular(
+        d_6h['temp'],d_6h['wind'],d_6h['hum'],d_6h['rain'],
+        d_6h['irradiance'],sector['lat'],sector['lon'],ts+datetime.timedelta(hours=6))
 
-    status = estado['nivel']
-    color  = estado['color']
-    nivel_conv = "NINGUNO"
+    status     = estado['nivel']
+    color      = estado['color']
+    storm_level= "NONE"
     is_snow = is_mixed = False
-    snow_intensity = "LIGERA"
+    snow_int = "LIGHT"
 
-    # ── CONVECCIÓN — PRIORIDAD ABSOLUTA ──
-    conv_status, conv_color, nivel_conv = evaluar_conveccion(
-        d_now['code'], d_now.get('cape',0), d_now.get('lifted_index',0))
-    if conv_status:
-        status = conv_status
-        color  = conv_color
-    # ── NIEVE / MIXTO (solo si no hay convección) ──
+    # ── STORM OVERRIDE — TIER 0, runs first, unconditional ──
+    s_status, s_color, storm_level = evaluate_storm(
+        d_now['code'],
+        d_now.get('cape',0),
+        d_now.get('lifted_index',0),
+        d_now.get('cin',0),
+        d_now.get('lightning_potential'),
+        aemet_active, aemet_severity
+    )
+    if s_status is not None:
+        status = s_status
+        color  = s_color
+    # ── Snow/mixed — only if no storm override ──
     elif 0 < d_now['temp'] <= 3 and d_now['rain'] > 0.1:
         is_mixed = True
-        status = "NIEVE PROBABLE" if d_now['temp']<=1.5 else "LLUVIA/NIEVE"
-        color  = "#3498db" if d_now['temp']<=1.5 else "#e67e22"
+        status = "SNOW LIKELY" if d_now['temp']<=1.5 else "RAIN/SNOW MIX"
+        color  = "#3498db"    if d_now['temp']<=1.5 else "#e67e22"
     elif d_now['rain']>0.1 and d_now['temp']<=1:
-        is_snow = True
-        snow_intensity = "INTENSA" if d_now['rain']>10 else "MODERADA" if d_now['rain']>3 else "LIGERA"
-    elif sector['altitude_m']>d_now['freezing_level']<9000 and d_now['rain']>0.1:
-        is_snow = True
-        snow_intensity = "INTENSA" if d_now['rain']>10 else "MODERADA" if d_now['rain']>3 else "LIGERA"
+        is_snow  = True
+        snow_int = "HEAVY" if d_now['rain']>10 else "MODERATE" if d_now['rain']>3 else "LIGHT"
+    elif sector['altitude_m']>d_now['freezing_level'] and d_now['freezing_level']<9000 and d_now['rain']>0.1:
+        is_snow  = True
+        snow_int = "HEAVY" if d_now['rain']>10 else "MODERATE" if d_now['rain']>3 else "LIGHT"
 
     if is_snow:
-        status = {"INTENSA":"NEVADA INTENSA","MODERADA":"NEVADA","LIGERA":"NEVADA LIGERA"}[snow_intensity]
-        color  = {"INTENSA":"#e74c3c","MODERADA":"#e67e22","LIGERA":"#f1c40f"}[snow_intensity]
+        status = {"HEAVY":"HEAVY SNOWFALL","MODERATE":"SNOWFALL","LIGHT":"LIGHT SNOW"}[snow_int]
+        color  = {"HEAVY":"#e74c3c","MODERATE":"#e67e22","LIGHT":"#f1c40f"}[snow_int]
 
     arrow = lambda c,f: "(-)" if f-c<-2 else "(+)" if f-c>2 else "(=)"
 
     fig, ax = plt.subplots(figsize=(6,3.4), facecolor='#0f172a')
     ax.set_facecolor('#0f172a')
     plt.subplots_adjust(left=0,right=1,top=1,bottom=0)
-
     ax.add_patch(patches.Rectangle((0,0),0.03,1,transform=ax.transAxes,linewidth=0,facecolor=color))
 
     plt.text(0.08,0.80,sector['name'],color='white',fontsize=16,fontweight='bold',transform=ax.transAxes)
     plt.text(0.08,0.68,f"{sector['desc']} | {sector['alt']}",color='#94a3b8',fontsize=8,fontweight='bold',transform=ax.transAxes)
 
     # Watermark
-    if nivel_conv in ["EXTREMO","SEVERO"]:
-        wm = "GRANIZO" if "GRANIZO" in status else "TORMENTA"
-    elif nivel_conv in ["ALTO","MODERADO"]:
-        wm = "TORMENTA"
+    if storm_level in ["EXTREME","SEVERE"]:
+        wm = "HAIL" if "HAIL" in status else "STORM"
+    elif storm_level in ["HIGH","MODERATE"]:
+        wm = "⚡"
+    elif storm_level == "LOW":
+        wm = "UNSTABLE"
     elif is_snow or is_mixed:
-        wm = "NIEVE"
+        wm = "SNOW"
     else:
-        wm = get_weather_text(d_now['code'],d_now['temp'],d_now['rain'],d_now['snowfall'])
+        wm = weather_text(d_now['code'],d_now['temp'],d_now['rain'],d_now['snowfall'])
     plt.text(0.5,0.40,wm,color='white',alpha=0.10,fontsize=40,fontweight='bold',ha='center',transform=ax.transAxes)
 
     plt.text(0.92,0.68,f"{int(d_now['temp'])}°",color='white',fontsize=38,fontweight='bold',ha='right',transform=ax.transAxes)
 
-    mri_col = "#ffffff" if status in ["CRÍTICO","PELIGRO","NEVADA INTENSA","GRANIZO — NO SALIR","TORMENTA SEVERA"] \
-              else "#38bdf8" if eei_now<d_now['temp'] else "#fca5a5"
+    danger_statuses = ["CRITICAL","DANGER","HEAVY SNOWFALL","HAIL — DO NOT RIDE",
+                       "SEVERE THUNDERSTORM","EXTREME STORM — DO NOT RIDE"]
+    mri_col = "#ffffff" if status in danger_statuses else "#38bdf8" if eei_now<d_now['temp'] else "#fca5a5"
     plt.text(0.92,0.55,f"MRI: {int(eei_now)}°",color=mri_col,fontsize=10,fontweight='bold',ha='right',transform=ax.transAxes)
-    plt.text(0.08,0.45,f"VIENTO {int(d_now['wind'])} km/h",color='#94a3b8',fontsize=7,transform=ax.transAxes)
+    plt.text(0.08,0.45,f"WIND {int(d_now['wind'])} km/h",color='#94a3b8',fontsize=7,transform=ax.transAxes)
+
+    # Lightning potential indicator
+    lp = d_now.get('lightning_potential') or 0
+    if lp > 0.1:
+        lp_col = "#8b0000" if lp>0.5 else "#e74c3c" if lp>0.3 else "#e67e22"
+        plt.text(0.92,0.45,f"⚡ {int(lp*100)}%",color=lp_col,fontsize=8,fontweight='bold',ha='right',transform=ax.transAxes)
 
     plt.text(0.92,0.25,f" {status} ",color='white',fontsize=9,fontweight='bold',ha='right',
              bbox=dict(boxstyle="round,pad=0.4",fc=color,ec="none",alpha=0.9),transform=ax.transAxes)
 
     plt.plot([0.05,0.95],[0.15,0.15],color='#334155',linewidth=1,transform=ax.transAxes)
 
-    def precip_label(d, alt):
-        if 95<=d['code']<=99: return "GRANIZO" if d['code'] in [96,99] else "TORMENTA"
-        if d['snowfall']>0.1 or (d['temp']<=2 and d['rain']>0.5): return "NIEVE"
-        if 0<d['temp']<=3 and d['rain']>0.1: return "NIEVE?" if d['temp']<=1.5 else "MIXTO"
-        if d['temp']<=1 and d['rain']>0.1: return "NIEVE"
-        if alt>d['freezing_level']<9000 and d['rain']>0.1: return "NIEVE"
-        return get_weather_text(d['code'],d['temp'],d['rain'],d['snowfall'])
+    def flabel(d, alt):
+        if 95<=d['code']<=99: return "HAIL" if d['code'] in [96,99] else "THUNDER"
+        if d['snowfall']>0.1 or (d['temp']<=2 and d['rain']>0.5): return "SNOW"
+        if 0<d['temp']<=3 and d['rain']>0.1: return "SNOW?" if d['temp']<=1.5 else "MIXED"
+        if d['temp']<=1 and d['rain']>0.1: return "SNOW"
+        if alt>d['freezing_level'] and d['freezing_level']<9000 and d['rain']>0.1: return "SNOW"
+        return weather_text(d['code'],d['temp'],d['rain'],d['snowfall'])
 
-    plt.text(0.05,0.09,f"+3H: {precip_label(d_3h,sector['altitude_m'])} {int(d_3h['temp'])}° {arrow(eei_now,eei_3h)}",
+    plt.text(0.05,0.09,f"+3H: {flabel(d_3h,sector['altitude_m'])} {int(d_3h['temp'])}° {arrow(eei_now,eei_3h)}",
              color='#94a3b8',fontsize=9,fontweight='bold',ha='left',transform=ax.transAxes)
-    plt.text(0.95,0.09,f"+6H: {precip_label(d_6h,sector['altitude_m'])} {int(d_6h['temp'])}° {arrow(eei_now,eei_6h)}",
+    plt.text(0.95,0.09,f"+6H: {flabel(d_6h,sector['altitude_m'])} {int(d_6h['temp'])}° {arrow(eei_now,eei_6h)}",
              color='#94a3b8',fontsize=9,fontweight='bold',ha='right',transform=ax.transAxes)
-    plt.text(0.5,0.02,f"ACTUALIZADO: {time_str} UTC | MQ RIDER INDEX™ v3.1",
+    plt.text(0.5,0.02,f"UPDATED: {time_str} UTC | MQ RIDER INDEX™ v3.1 + LIGHTNING",
              color='#475569',fontsize=6,ha='center',transform=ax.transAxes)
 
     ax.axis('off')
     plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png",dpi=150,facecolor='#0f172a')
     plt.close()
 
-    return status, int(eei_now), d_now['wind'], is_snow or is_mixed, snow_intensity, eei_3h, eei_6h, nivel_conv
+    return status, int(eei_now), d_now['wind'], is_snow or is_mixed, snow_int, eei_3h, eei_6h, storm_level
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
 # BANNER
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generate_banner(status, min_eei, max_wind, worst_sector, time_str, snow, conv):
+# ─────────────────────────────────────────────────────────────────────────────
+def generate_banner(status, min_eei, max_wind, worst_sector, time_str, snow, storm_level):
     fig, ax = plt.subplots(figsize=(8,2.5), facecolor='#0a0a0a')
     ax.set_facecolor('#0a0a0a')
     plt.subplots_adjust(left=0,right=1,top=1,bottom=0)
 
     color = "#2ecc71"
-    if any(x in status for x in ["INESTAB","NEVADA LIGERA","MIXTO","PROBABLE"]): color="#f1c40f"
-    if any(x in status for x in ["ALERTA","NEVADA","TORMENTA PROBABLE","INMINENTE"]): color="#e67e22"
-    if any(x in status for x in ["TORMENTA ELÉCTRICA","SEVERA","PELIGRO","NEVADA INTENSA"]): color="#e74c3c"
-    if any(x in status for x in ["GRANIZO","CRÍTICO"]): color="#8b0000"
+    if any(x in status for x in ["INSTABILITY","LIGHT SNOW","MIXED","PROBABLE","POSSIBLE"]): color="#f1c40f"
+    if any(x in status for x in ["WARNING","SNOW ","STORM PROBABLE","IMMINENT","CAUTION","LOW"]): color="#e67e22"
+    if any(x in status for x in ["THUNDERSTORM","SEVERE","DANGER","HEAVY SNOW","LIGHTNING RISK"]): color="#e74c3c"
+    if any(x in status for x in ["HAIL","CRITICAL","EXTREME"]): color="#8b0000"
 
     ax.add_patch(patches.Rectangle((0,0),0.015,1,transform=ax.transAxes,linewidth=0,facecolor=color))
 
@@ -376,23 +488,25 @@ def generate_banner(status, min_eei, max_wind, worst_sector, time_str, snow, con
     plt.text(0.28,0.70,"MQ METEO STATION",color='white',fontsize=14,fontweight='bold',transform=ax.transAxes)
 
     if color=="#2ecc71":
-        hook="TODOS LOS SECTORES: CONDICIONES OK"; sub=f"ACTUALIZADO: {time_str} UTC"
-    elif conv!="NINGUNO":
-        hook=f"⚡ {status}: {worst_sector}"; sub=f"ACTUALIZADO: {time_str} UTC | CONVECCIÓN ACTIVA"
+        hook="ALL SECTORS: GO"; sub=f"UPDATED: {time_str} UTC | V20.0 CONVECTION + LIGHTNING"
+    elif storm_level not in ["NONE",None]:
+        hook=f"⚡ {status} — {worst_sector}"; sub=f"UPDATED: {time_str} UTC | LIGHTNING LAYER ACTIVE"
     elif snow:
-        hook=f"NIEVE: {worst_sector}"; sub=f"ACTUALIZADO: {time_str} UTC"
+        hook=f"SNOW ALERT: {worst_sector}"; sub=f"UPDATED: {time_str} UTC"
     else:
-        hook=f"AVISO: {worst_sector}"; sub=f"ACTUALIZADO: {time_str} UTC"
+        hook=f"ALERT: {worst_sector}"; sub=f"UPDATED: {time_str} UTC"
 
     plt.text(0.28,0.50,hook,color=color,fontsize=10,fontweight='bold',transform=ax.transAxes)
     plt.text(0.28,0.35,sub,color='#888',fontsize=8,transform=ax.transAxes)
     plt.plot([0.68,0.68],[0.2,0.8],color='#222',linewidth=1,transform=ax.transAxes)
 
     plt.text(0.76,0.70,"MIN MRI",color='#666',fontsize=7,ha='center',transform=ax.transAxes)
-    plt.text(0.76,0.45,f"{min_eei}°",color="#38bdf8" if min_eei<10 else "white",
+    plt.text(0.76,0.45,f"{min_eei}°",
+             color="#38bdf8" if min_eei<10 else "white",
              fontsize=20,fontweight='bold',ha='center',transform=ax.transAxes)
-    plt.text(0.90,0.70,"VIENTO MÁX",color='#666',fontsize=7,ha='center',transform=ax.transAxes)
-    plt.text(0.90,0.45,f"{int(max_wind)}",color="#e67e22" if max_wind>30 else "white",
+    plt.text(0.90,0.70,"MAX WIND",color='#666',fontsize=7,ha='center',transform=ax.transAxes)
+    plt.text(0.90,0.45,f"{int(max_wind)}",
+             color="#e67e22" if max_wind>30 else "white",
              fontsize=20,fontweight='bold',ha='center',transform=ax.transAxes)
     plt.text(0.90,0.32,"km/h",color='#666',fontsize=7,ha='center',transform=ax.transAxes)
 
@@ -411,63 +525,78 @@ def generate_map():
             tooltip=s['name']).add_to(m)
     m.save(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html")
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
 # MAIN
-# ═══════════════════════════════════════════════════════════════════════════
-
-print("\n🚀 OBTENIENDO DATOS...")
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n📡 FETCHING DATA...")
 now          = datetime.datetime.now()
 time_str     = now.strftime("%H:%M")
 current_hour = now.hour
 
-worst_status = "ESTABLE"; worst_sector = ""
-g_min_eei = 99; g_max_wind = 0
-snow_detected = conv_detected = False
+# ── TIER 0: AEMET storm alerts — global check before any sector loop ──
+print("⚡ Checking AEMET storm alerts...")
+aemet_storm_active, aemet_alert_text, aemet_storm_severity = check_aemet_storm_alerts()
+print(f"   {aemet_alert_text}")
+
+worst_status  = "STABLE"; worst_sector = ""
+g_min_eei     = 99; g_max_wind = 0
+snow_detected = storm_detected = False
+g_storm_level = "NONE"
 json_sectors  = []
 
-print("☀️  NASA POWER (parallel)...")
-t0 = time.time()
+print("\n☀️  NASA POWER (parallel)...")
+t0           = time.time()
 nasa_cache   = fetch_nasa_parallel(sectors, now)
 elapsed      = time.time()-t0
 nasa_success = len(nasa_cache)
-print(f"   ✅ {nasa_success}/{len(sectors)} sectores ({elapsed:.1f}s)")
+print(f"   ✅ {nasa_success}/{len(sectors)} sectors ({elapsed:.1f}s)")
 
-print("\n🌍 Procesando sectores...")
+print("\n🌍 Processing sectors...")
 for sec in sectors:
     try:
-        url = (f"https://api.open-meteo.com/v1/forecast"
-               f"?latitude={sec['lat']}&longitude={sec['lon']}"
-               f"&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,"
-               f"relativehumidity_2m,global_tilted_irradiance,snowfall,"
-               f"freezing_level_height,cape,lifted_index&forecast_days=2")
-        r = requests.get(url, timeout=10).json()
+        # ── Open-Meteo request — includes all convection fields ──
+        r = requests.get(
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={sec['lat']}&longitude={sec['lon']}"
+            f"&hourly=temperature_2m,windspeed_10m,weathercode,precipitation,"
+            f"relativehumidity_2m,global_tilted_irradiance,snowfall,"
+            f"freezing_level_height,cape,lifted_index,"
+            f"convective_inhibition,lightning_potential"
+            f"&forecast_days=2",
+            timeout=10).json()
 
-        d_now = get_hourly(r, sec, current_hour,     nasa_cache)
-        d_3h  = get_hourly(r, sec, current_hour+3,   nasa_cache)
-        d_6h  = get_hourly(r, sec, current_hour+6,   nasa_cache)
+        d_now = get_hourly(r, sec, current_hour,   nasa_cache)
+        d_3h  = get_hourly(r, sec, current_hour+3, nasa_cache)
+        d_6h  = get_hourly(r, sec, current_hour+6, nasa_cache)
 
-        if d_now['temp']!=0:
+        # Freezing level sanity
+        if d_now['temp'] != 0:
             efl = sec['altitude_m']+(d_now['temp']/0.0065)
             if abs(d_now['freezing_level']-efl)>500:
                 d_now['freezing_level']=d_3h['freezing_level']=d_6h['freezing_level']=efl
 
-        stat, eei_val, wind_val, is_snow, snow_int, eei_3h, eei_6h, nivel_conv = generate_card(
-            sec, d_now, d_3h, d_6h, time_str)
+        stat, eei_val, wind_val, is_snow, snow_int, eei_3h, eei_6h, storm_level = generate_card(
+            sec, d_now, d_3h, d_6h, time_str, aemet_storm_active, aemet_storm_severity)
 
-        if eei_val  < g_min_eei: g_min_eei  = eei_val
+        if eei_val  < g_min_eei:  g_min_eei  = eei_val
         if wind_val > g_max_wind: g_max_wind = wind_val
-        if is_snow:  snow_detected = True
-        if nivel_conv!="NINGUNO": conv_detected = True
+        if is_snow:  snow_detected  = True
+        if storm_level != "NONE":
+            storm_detected = True
+            g_storm_level  = storm_level
 
-        if any(x in stat for x in ["AVISO","NEVADA","TORMENTA","GRANIZO","INESTAB","ALERTA","PROBABLE","INMINENTE","PELIGRO","CRÍTICO"]):
+        if any(x in stat for x in ["WARNING","SNOW","STORM","HAIL","DANGER","CRITICAL",
+                                    "THUNDER","LIGHTNING","INSTABILITY","IMMINENT","PROBABLE"]):
             worst_status = stat; worst_sector = sec['name']
 
-        flags = " ".join(filter(None,[
-            f"⚡{nivel_conv}" if nivel_conv!="NINGUNO" else "",
-            f"❄{snow_int}" if is_snow else "",
-            "🌫️" if d_now.get('fog_alert') else ""
+        lp_str = f"LP:{d_now.get('lightning_potential') or 0:.0%}" if (d_now.get('lightning_potential') or 0)>0.05 else ""
+        flags  = " ".join(filter(None,[
+            f"⚡{storm_level}" if storm_level!="NONE" else "",
+            f"❄{snow_int}"   if is_snow else "",
+            "🌫" if d_now.get('fog_alert') else "",
+            lp_str
         ]))
-        print(f"✅ {sec['name']:20} | MRI:{eei_val:3d}° | {stat:<25} {flags}")
+        print(f"✅ {sec['name']:20} | MRI:{eei_val:3d}° | {stat:<30} {flags}")
 
     except Exception as e:
         print(f"❌ {sec['name']:20} | {str(e)[:60]}")
@@ -479,86 +608,133 @@ for sec in sectors:
         "terrain_type": sec['type'], "description": sec['desc'],
         "current": {
             "eei": eei_val, "status": stat,
-            "temp": round(d_now['temp'],1), "wind": round(d_now['wind'],1),
-            "rain": round(d_now['rain'],1), "humidity": d_now['hum'],
+            "temp": round(d_now['temp'],1),
+            "wind": round(d_now['wind'],1),
+            "rain": round(d_now['rain'],1),
+            "humidity": d_now['hum'],
             "irradiance": round(d_now['irradiance'],1),
             "irradiance_source": d_now.get('irradiance_source','OPEN_METEO'),
             "freezing_level": round(d_now['freezing_level'],0),
-            "snow_detected": is_snow, "snow_intensity": snow_int if is_snow else None,
+            "snow_detected": is_snow,
+            "snow_intensity": snow_int if is_snow else None,
             "cape": round(d_now.get('cape',0),0),
             "lifted_index": round(d_now.get('lifted_index',0),1),
-            "convection_level": nivel_conv,
+            "cin": round(d_now.get('cin',0),0),
+            "lightning_potential": round((d_now.get('lightning_potential') or 0)*100,1),
+            "storm_level": storm_level,
+            "aemet_storm_alert": aemet_storm_active,
             "microclimate_notes": d_now.get('fog_alert') or d_now.get('mtb_hazard') or None,
             "aemet_calibrated": sec['name'] in aemet_corrections
         },
-        "forecast_3h": {"eei":round(eei_3h,1),"temp":round(d_3h['temp'],1),
-                        "wind":round(d_3h['wind'],1),"rain":round(d_3h['rain'],1)},
-        "forecast_6h": {"eei":round(eei_6h,1),"temp":round(d_6h['temp'],1),
-                        "wind":round(d_6h['wind'],1),"rain":round(d_6h['rain'],1)}
+        "forecast_3h": {
+            "eei":  round(eei_3h,1),
+            "temp": round(d_3h['temp'],1),
+            "wind": round(d_3h['wind'],1),
+            "rain": round(d_3h['rain'],1),
+            "lightning_potential": round((d_3h.get('lightning_potential') or 0)*100,1)
+        },
+        "forecast_6h": {
+            "eei":  round(eei_6h,1),
+            "temp": round(d_6h['temp'],1),
+            "wind": round(d_6h['wind'],1),
+            "rain": round(d_6h['rain'],1),
+            "lightning_potential": round((d_6h.get('lightning_potential') or 0)*100,1)
+        }
     })
 
-generate_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected, nivel_conv)
+generate_banner(worst_status, g_min_eei, g_max_wind, worst_sector, time_str, snow_detected, g_storm_level)
 generate_map()
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
 # JSON
-# ═══════════════════════════════════════════════════════════════════════════
-
-print("\n📊 JSON...")
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n📊 Writing JSON...")
 status_data = {
-    "timestamp_utc": now.isoformat(), "last_update": time_str,
-    "event": "MQ2026", "model_version": "MQ Rider Index v3.1 + Convección | V20.0",
+    "timestamp_utc": now.isoformat(),
+    "last_update":   time_str,
+    "event":         "MQ2026",
+    "model_version": "MQ Rider Index™ v3.1 + Lightning Layer | BELLATOR V20.0",
     "data_sources": [
-        "ECMWF (Open-Meteo) - TIER 1","NASA POWER (parallel) - TIER 2",
-        f"AEMET ({len(aemet_corrections)} sectores) - TIER 3",
-        "Microclima Portugal - TIER 4","Capa Convección (CAPE+LI+weathercode) - TIER 0"
+        "ECMWF IFS (Open-Meteo) — TIER 1",
+        "NASA POWER (parallel) — TIER 2",
+        f"AEMET calibration ({len(aemet_corrections)} sectors) — TIER 3",
+        "Portugal Microclimate Algorithms — TIER 4",
+        "Lightning Layer: lightning_potential + CAPE + CIN + weathercode + AEMET alerts — TIER 0 OVERRIDE"
     ],
-    "api_version": "v20.0",
+    "api_version": "v20.0_lightning",
     "summary": {
-        "alert_level": worst_status, "worst_sector": worst_sector or "TODOS",
-        "min_mri": g_min_eei, "max_wind": round(g_max_wind,1),
-        "snow_detected": snow_detected, "convection_detected": conv_detected,
+        "alert_level":       worst_status,
+        "worst_sector":      worst_sector or "ALL SECTORS",
+        "min_mri":           g_min_eei,
+        "max_wind":          round(g_max_wind,1),
+        "snow_detected":     snow_detected,
+        "storm_detected":    storm_detected,
+        "storm_level":       g_storm_level,
+        "aemet_storm_alert": aemet_storm_active,
+        "aemet_alert_text":  aemet_alert_text,
         "nasa_power_coverage": f"{nasa_success}/{len(sectors)}",
-        "aemet_calibrated_sectors": len(aemet_corrections), "aemet_status": aemet_status
+        "aemet_calibrated_sectors": len(aemet_corrections),
+        "aemet_status": aemet_status
+    },
+    "storm_thresholds": {
+        "HAIL — DO NOT RIDE":        "weathercode 96/99",
+        "SEVERE THUNDERSTORM":       "weathercode 95-99 + CAPE>2500 or lightning>50%",
+        "THUNDERSTORM":              "weathercode 95-99",
+        "LIGHTNING RISK — HIGH":     "lightning_potential > 50%",
+        "LIGHTNING RISK":            "lightning_potential > 30%",
+        "LIGHTNING POSSIBLE":        "lightning_potential > 10%",
+        "STORM IMMINENT":            "CAPE>2500 + LI<-4 + CIN not suppressed",
+        "STORM PROBABLE":            "CAPE>1500 + LI<-2 + CIN not suppressed",
+        "ATMOSPHERIC INSTABILITY":   "CAPE>800"
     },
     "sectors": json_sectors,
     "usage": {
-        "ghost_rider": "sectors[].current.eei — ajuste de ritmo por sector",
-        "bios": "sectors[].current.eei + convection_level — multiplicador de estrés",
-        "endpoint": "https://mountainquest.pt/atmos/MQ_ATMOS_STATUS.json"
+        "ghost_rider": "sectors[].current.eei — pace adjustment per sector",
+        "bios":        "sectors[].current.eei + storm_level — stress multiplier",
+        "lightning":   "sectors[].current.lightning_potential — % probability",
+        "endpoint":    "https://mountainquest.pt/atmos/MQ_ATMOS_STATUS.json"
     }
 }
 
-with open(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",'w') as f:
+json_path = f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json"
+with open(json_path,'w') as f:
     json.dump(status_data, f, indent=2)
-print(f"✅ JSON: {OUTPUT_FOLDER}MQ_ATMOS_STATUS.json")
+print(f"✅ {json_path}")
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
 # FTP
-# ═══════════════════════════════════════════════════════════════════════════
-
-print("\n🚀 FTP...")
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n🚀 FTP upload...")
 if "FTP_USER" in os.environ:
     try:
-        ftp = ftplib.FTP(); ftp.connect("ftp.nexplore.pt",21,timeout=30)
-        ftp.login(os.environ["FTP_USER"], os.environ["FTP_PASS"]); ftp.set_pasv(True)
+        ftp = ftplib.FTP()
+        ftp.connect("ftp.nexplore.pt", 21, timeout=30)
+        ftp.login(os.environ["FTP_USER"], os.environ["FTP_PASS"])
+        ftp.set_pasv(True)
         def up(local, remote):
             if os.path.exists(local):
-                with open(local,'rb') as f: ftp.storbinary(f'STOR {remote}',f)
+                with open(local,'rb') as f: ftp.storbinary(f'STOR {remote}', f)
                 print(f"   ✓ {remote}")
-        up(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png",             "MQ_HOME_BANNER.png")
-        up(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html","MQ_TACTICAL_MAP_CALIBRATED.html")
-        up(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",           "MQ_ATMOS_STATUS.json")
-        for i in range(1,7): up(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png",f"MQ_SECTOR_{i}_STATUS.png")
-        ftp.quit(); print("✅ FTP OK → mountainquest.pt/atmos/MQ_ATMOS_STATUS.json")
-    except Exception as e: print(f"❌ FTP: {e}")
+        up(f"{OUTPUT_FOLDER}MQ_HOME_BANNER.png",              "MQ_HOME_BANNER.png")
+        up(f"{OUTPUT_FOLDER}MQ_TACTICAL_MAP_CALIBRATED.html", "MQ_TACTICAL_MAP_CALIBRATED.html")
+        up(f"{OUTPUT_FOLDER}MQ_ATMOS_STATUS.json",            "MQ_ATMOS_STATUS.json")
+        for i in range(1,7):
+            up(f"{OUTPUT_FOLDER}MQ_SECTOR_{i}_STATUS.png", f"MQ_SECTOR_{i}_STATUS.png")
+        ftp.quit()
+        print("✅ FTP complete → mountainquest.pt/atmos/MQ_ATMOS_STATUS.json")
+    except Exception as e:
+        print(f"❌ FTP: {e}")
 else:
-    print("⚠️  MODO LOCAL")
+    print("⚠️  LOCAL MODE — FTP_USER not set")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SUMMARY
+# ─────────────────────────────────────────────────────────────────────────────
 print(f"\n{'═'*60}")
 print(f"BELLATOR V20.0 | {now.strftime('%Y-%m-%d %H:%M UTC')}")
-print(f"MRI MIN: {g_min_eei}°C | VIENTO MÁX: {int(g_max_wind)} km/h")
-print(f"NIEVE: {'SÍ' if snow_detected else 'NO'} | CONVECCIÓN: {'SÍ' if conv_detected else 'NO'}")
-print(f"NASA: {nasa_success}/{len(sectors)} | AEMET: {len(aemet_corrections)} sectores")
+print(f"MIN MRI: {g_min_eei}°C | MAX WIND: {int(g_max_wind)} km/h")
+print(f"SNOW: {'YES' if snow_detected else 'NO'} | STORM: {'YES — '+g_storm_level if storm_detected else 'NO'}")
+print(f"AEMET ALERT: {'YES — '+aemet_alert_text[:50] if aemet_storm_active else 'NO'}")
+print(f"NASA: {nasa_success}/{len(sectors)} | AEMET calib: {len(aemet_corrections)} sectors")
 print(f"STATUS: {worst_status}")
 print(f"{'═'*60}\n")
