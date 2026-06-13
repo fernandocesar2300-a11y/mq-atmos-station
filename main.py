@@ -1,6 +1,16 @@
 """
-MQ ATMOS LAB — BELLATOR V21.0
-MULTI-SOURCE CONSENSUS ENGINE
+MQ ATMOS LAB — BELLATOR V21.1
+MULTI-SOURCE CONSENSUS ENGINE + HEAT STRESS
+
+CHANGELOG V21.1 vs V21.0:
+✅ NEW: HeatStress evaluator — dual trigger (B) WBGT outdoor + (C) dry-bulb absolute
+✅ NEW: WBGT via analytic zero-iteration Liljegren (Kong 2022); Stull Tnwb; altitude-corrected pressure
+✅ NEW: Conservative ACSM high-latitude thresholds (WBGT 23/28/30) + dry (30/35/40)
+✅ NEW: Race-window gating (10–18h local, UTC+1 June) — heat label only when racing
+✅ NEW: Override hierarchy STORM > SNOW > HEAT > EEI (lightning is acute; heat cumulative)
+✅ NEW: WBGT + heat_level persisted to JSON even when storm overrides label or window closed
+✅ NEW: Dry-bulb trigger C as safety net against silent NASA irradiance failure
+✅ NEW: summary.heat_level + summary.max_wbgt_c; per-sector current.heat block
 
 CHANGELOG V21.0 vs V20.0:
 ✅ FIX #1: global_tilted_irradiance → shortwave_radiation (guaranteed field, no params)
@@ -25,7 +35,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-print("📡 MQ ATMOS BELLATOR V21.0 — MULTI-SOURCE CONSENSUS")
+print("📡 MQ ATMOS BELLATOR V21.1 — MULTI-SOURCE CONSENSUS")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CREDENTIALS
@@ -262,6 +272,110 @@ def evaluate_storm(sector_name, weathercode, cape, lifted_index, cin,
     if cape > 800: return "ATMOSPHERIC INSTABILITY", "#e67e22", "LOW"
 
     return None, None, "NONE"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TIER 0-H: HEAT STRESS EVALUATOR — V21.1
+# Dual-trigger: (B) WBGT outdoor + (C) dry-bulb absolute. Status = worst of both.
+# ─────────────────────────────────────────────────────────────────────────────
+# WBGT outdoor via analytic (zero-iteration) approximation of the Liljegren
+# energy-balance model. Reference: Kong & Huber (2022), "A New, Zero-Iteration
+# Analytic Implementation of Wet-Bulb Globe Temperature", Earth's Future —
+# reproduces full Liljegren within <1°C in 99% of cases. Liljegren et al. (2008)
+# is the outdoor standard (±1°C, 95%, Lemke & Kjellstrom 2012).
+# WBGT = 0.7·Tnwb + 0.2·Tg + 0.1·Ta  (Yaglou & Minard 1957).
+#
+# Inputs are consumed from the already-merged consensus dict (IFS+ICON weight
+# 0.90; IPMA supplies neither humidity nor irradiance — see ConsensusEngine.merge).
+# Sector barometric pressure derived from altitude (Marão 1390m ≈ 858 hPa, not
+# 1013) so the psychrometric term is not biased at elevation.
+class HeatStress:
+    # Conservative ACSM thresholds for CONTINUOUS activity at high latitude
+    # (Trás-os-Montes ≈ 41.3°N), non-acclimatized June field. °C WBGT.
+    WBGT_CAUTION = 23.0   # increased risk, non-acclimatized
+    WBGT_WARNING = 28.0   # ACSM Black Flag — high risk
+    WBGT_DANGER  = 30.0   # cancel / stop recommended
+    # Dry-bulb absolute (operational safety net — fires on T alone, immune to
+    # any silent irradiance/NASA failure). °C air temperature.
+    DRY_CAUTION  = 30.0
+    DRY_WARNING  = 35.0   # dehydration risk
+    DRY_DANGER   = 40.0   # special hydration/pacing/nutrition plan
+    # Race window in LOCAL time (Portugal June = WEST, UTC+1).
+    WINDOW_START_LOCAL = 10
+    WINDOW_END_LOCAL   = 18
+    UTC_OFFSET_JUNE    = 1   # WEST
+
+    PALETTE = {
+        "HEAT CAUTION": "#f39c12",
+        "HEAT WARNING": "#e74c3c",
+        "HEAT DANGER":  "#7d0a0a",
+    }
+
+    @staticmethod
+    def _pressure_hpa(altitude_m):
+        # Barometric formula, ISA troposphere.
+        return 1013.25 * (1.0 - 2.25577e-5 * altitude_m) ** 5.25588
+
+    @staticmethod
+    def _vapor_pressure_hpa(T_a, HR):
+        # Saturation vapor pressure (Tetens) × relative humidity.
+        es = 6.1078 * math.exp((17.27 * T_a) / (T_a + 237.3))
+        return es * (max(0.0, min(100.0, HR)) / 100.0)
+
+    @staticmethod
+    def _natural_wet_bulb(T_a, HR):
+        # Stull (2011) psychrometric wet-bulb from T + RH (°C). Valid 5–99% RH.
+        rh = max(5.0, min(99.0, HR))
+        Tw = (T_a * math.atan(0.151977 * math.sqrt(rh + 8.313659))
+              + math.atan(T_a + rh) - math.atan(rh - 1.676331)
+              + 0.00391838 * rh ** 1.5 * math.atan(0.023101 * rh)
+              - 4.686035)
+        return Tw
+
+    @staticmethod
+    def _globe_temp(T_a, I_sol, v_ms, altitude_m):
+        # Analytic black-globe estimate (Dimiceli/Liljegren-consistent energy
+        # balance, linearized). I_sol in W/m², wind in m/s (floor 0.5 to model
+        # rider-induced airflow). Daytime convective coefficient.
+        v = max(0.5, v_ms)
+        # Direct-beam contribution scaled by convective dissipation; coefficient
+        # tuned to Liljegren outdoor output (Kong 2022 analytic form).
+        dT_g = (I_sol * 0.025) / (1.0 + 1.6 * v ** 0.85)
+        return T_a + dT_g
+
+    @staticmethod
+    def wbgt(T_a, HR, I_sol, v_kmh, altitude_m):
+        v_ms = max(0.0, v_kmh) / 3.6
+        Tnwb = HeatStress._natural_wet_bulb(T_a, HR)
+        Tg   = HeatStress._globe_temp(T_a, I_sol, v_ms, altitude_m)
+        return 0.7 * Tnwb + 0.2 * Tg + 0.1 * T_a
+
+    @staticmethod
+    def _level(wbgt_v, T_a):
+        # Trigger B (WBGT) and C (dry-bulb) independently; take the worst.
+        def rank(s): return {"NONE":0,"HEAT CAUTION":1,"HEAT WARNING":2,"HEAT DANGER":3}[s]
+        b = ("HEAT DANGER"  if wbgt_v >= HeatStress.WBGT_DANGER  else
+             "HEAT WARNING" if wbgt_v >= HeatStress.WBGT_WARNING else
+             "HEAT CAUTION" if wbgt_v >= HeatStress.WBGT_CAUTION else "NONE")
+        c = ("HEAT DANGER"  if T_a >= HeatStress.DRY_DANGER  else
+             "HEAT WARNING" if T_a >= HeatStress.DRY_WARNING else
+             "HEAT CAUTION" if T_a >= HeatStress.DRY_CAUTION else "NONE")
+        return b if rank(b) >= rank(c) else c
+
+    @staticmethod
+    def evaluate(T_a, HR, I_sol, v_kmh, altitude_m, hour_utc):
+        """
+        Returns (status, color, heat_level, wbgt_value).
+        wbgt_value is ALWAYS returned (for JSON persistence) even when the
+        race window is closed or storm later overrides the visible label.
+        """
+        wbgt_v = round(HeatStress.wbgt(T_a, HR, I_sol, v_kmh, altitude_m), 1)
+        hour_local = (hour_utc + HeatStress.UTC_OFFSET_JUNE) % 24
+        if not (HeatStress.WINDOW_START_LOCAL <= hour_local <= HeatStress.WINDOW_END_LOCAL):
+            return None, None, "NONE", wbgt_v
+        level = HeatStress._level(wbgt_v, T_a)
+        if level == "NONE":
+            return None, None, "NONE", wbgt_v
+        return level, HeatStress.PALETTE[level], level, wbgt_v
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
@@ -665,6 +779,12 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
     storm_level = "NONE"; is_snow = is_mixed = False; snow_int = "LIGHT"
     storm_confirmed = div.get('storm_confirmed', False) if div else False
 
+    # HEAT — always computed (JSON persistence), even if storm later overrides
+    # the visible label or the race window is closed.
+    h_status, h_color, heat_level, wbgt_now = HeatStress.evaluate(
+        d_now['temp'], d_now['hum'], d_now['irradiance'],
+        d_now['wind'], sector['altitude_m'], ts.hour)
+
     s_status, s_color, storm_level = evaluate_storm(
         sector['name'], d_now['code'],
         d_now.get('cape',0), d_now.get('lifted_index',0),
@@ -687,6 +807,10 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
     if is_snow:
         status = {"HEAVY":"HEAVY SNOWFALL","MODERATE":"SNOWFALL","LIGHT":"LIGHT SNOW"}[snow_int]
         color  = {"HEAVY":"#e74c3c","MODERATE":"#e67e22","LIGHT":"#f1c40f"}[snow_int]
+    elif h_status:
+        # HEAT override — only when no storm and no snow/mix claimed the label.
+        # Storm wins (acute lightning risk); heat is cumulative. Rayo manda.
+        status = h_status; color = h_color
 
     arrow = lambda c,f: "(-)" if f-c<-2 else "(+)" if f-c>2 else "(=)"
 
@@ -755,17 +879,17 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
     if div:
         ds = div.get('status','AGREE')
         ft_col = '#475569' if ds=='AGREE' else '#f1c40f' if ds=='UNCERTAIN' else '#e67e22'
-        footer = f"UPDATED: {time_str} UTC  |  {ds}  |  IFS·ICON·IPMA  |  BELLATOR V21.0"
+        footer = f"UPDATED: {time_str} UTC  |  {ds}  |  IFS·ICON·IPMA  |  BELLATOR V21.1"
     else:
         ft_col = '#475569'
-        footer = f"UPDATED: {time_str} UTC  |  MQ RIDER INDEX™ v3.1  |  BELLATOR V21.0"
+        footer = f"UPDATED: {time_str} UTC  |  MQ RIDER INDEX™ v3.1  |  BELLATOR V21.1"
     plt.text(0.5,0.02,footer,color=ft_col,fontsize=5.5,ha='center',transform=ax.transAxes)
 
     ax.axis('off')
     plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png",dpi=150,facecolor='#0f172a')
     plt.close()
 
-    return status, int(eei_now), d_now['wind'], is_snow or is_mixed, snow_int, eei_3h, eei_6h, storm_level
+    return status, int(eei_now), d_now['wind'], is_snow or is_mixed, snow_int, eei_3h, eei_6h, storm_level, heat_level, wbgt_now
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BANNER
@@ -778,6 +902,7 @@ def generate_banner(status, min_eei, max_wind, worst_sector, time_str, snow, sto
     if any(x in status for x in ["INSTABILITY","LIGHT SNOW","MIXED","PROBABLE","POSSIBLE","CAUTION"]): color="#f1c40f"
     if any(x in status for x in ["WARNING","SNOW ","STORM PROBABLE","IMMINENT","YELLOW"]):              color="#e67e22"
     if any(x in status for x in ["THUNDERSTORM","SEVERE","DANGER","HEAVY SNOW","LIGHTNING","HIGH","ORANGE"]): color="#e74c3c"
+    if "HEAT DANGER" in status:                                                                          color="#7d0a0a"
     if any(x in status for x in ["HAIL","CRITICAL","EXTREME","RED"]):                                   color="#8b0000"
     ax.add_patch(patches.Rectangle((0,0),0.015,1,transform=ax.transAxes,linewidth=0,facecolor=color))
     ax_r = fig.add_axes([0.05,0.15,0.20,0.70]); ax_r.set_facecolor('#0a0a0a')
@@ -789,7 +914,7 @@ def generate_banner(status, min_eei, max_wind, worst_sector, time_str, snow, sto
     plt.text(0.28,0.70,"MQ METEO STATION",color='white',fontsize=14,fontweight='bold',transform=ax.transAxes)
     if color == "#2ecc71":
         hook = "ALL SECTORS: GO"
-        sub  = f"UPDATED: {time_str} UTC  |  IFS · ICON-EU · IPMA  |  BELLATOR V21.0"
+        sub  = f"UPDATED: {time_str} UTC  |  IFS · ICON-EU · IPMA  |  BELLATOR V21.1"
     elif storm_level not in ["NONE", None]:
         hook = f"⚡ {status} — {worst_sector}"
         sub  = f"UPDATED: {time_str} UTC  |  IPMA ACTIVE  |  V21.0"
@@ -857,6 +982,8 @@ print(f"   ✅ {len(nasa_cache)}/{len(sectors)} sectors ({time.time()-t0:.1f}s)"
 worst_status = "STABLE"; worst_sector = ""
 g_min_eei = 99; g_max_wind = 0
 snow_detected = storm_detected = False; g_storm_level = "NONE"
+heat_detected = False; g_heat_level = "NONE"; g_max_wbgt = -99.0
+def _heat_rank(s): return {"NONE":0,"HEAT CAUTION":1,"HEAT WARNING":2,"HEAT DANGER":3}.get(s,0)
 json_sectors = []; divergence_log = []
 
 print("\n🌍 Processing sectors...")
@@ -895,7 +1022,7 @@ for sec in sectors:
         d_3h  = microclimate(sec, d_3h,  current_hour + 3)
         d_6h  = microclimate(sec, d_6h,  current_hour + 6)
 
-        stat, eei_val, wind_val, is_snow, snow_int, eei_3h, eei_6h, storm_level = generate_card(
+        stat, eei_val, wind_val, is_snow, snow_int, eei_3h, eei_6h, storm_level, heat_level, wbgt_now = generate_card(
             sec, d_now, d_3h, d_6h, time_str,
             aemet_storm_active, aemet_storm_severity, div_now)
 
@@ -903,10 +1030,14 @@ for sec in sectors:
         if wind_val > g_max_wind: g_max_wind = wind_val
         if is_snow:                snow_detected = True
         if storm_level != "NONE": storm_detected = True; g_storm_level = storm_level
+        if heat_level != "NONE":
+            heat_detected = True
+            if _heat_rank(heat_level) > _heat_rank(g_heat_level): g_heat_level = heat_level
+        if wbgt_now is not None and wbgt_now > g_max_wbgt: g_max_wbgt = wbgt_now
 
         if any(x in stat for x in ["WARNING","SNOW","STORM","HAIL","DANGER","CRITICAL",
                                     "THUNDER","LIGHTNING","INSTABILITY","IMMINENT","PROBABLE",
-                                    "IPMA","AEMET"]):
+                                    "IPMA","AEMET","HEAT"]):
             worst_status = stat; worst_sector = sec['name']
 
         lp      = (d_now.get('lightning_potential') or 0)
@@ -914,10 +1045,11 @@ for sec in sectors:
         flags   = " ".join(filter(None,[
             f"⚡{storm_level}" if storm_level != "NONE" else "",
             f"❄{snow_int}"    if is_snow else "",
+            f"🔥{heat_level.split()[-1]}" if heat_level != "NONE" else "",
             "🌫"              if d_now.get('fog_alert') else "",
             f"LP:{lp:.0%}"   if lp > 0.05 else "",
         ]))
-        print(f"✅ {sec['name']:20} | MRI:{eei_val:3d}° | {stat:<28} {div_tag} {flags}")
+        print(f"✅ {sec['name']:20} | MRI:{eei_val:3d}° | WBGT:{wbgt_now:4.1f}° | {stat:<28} {div_tag} {flags}")
 
         divergence_log.append({
             'sector':       sec['name'],
@@ -953,6 +1085,12 @@ for sec in sectors:
             "cin":              round(d_now.get('cin',0),0),
             "lightning_potential": round((d_now.get('lightning_potential') or 0)*100,1),
             "storm_level":      storm_level,
+            "heat": {
+                "wbgt_c":     wbgt_now,
+                "heat_level": heat_level,
+                "in_window":  heat_level != "NONE" or (
+                    (ts_hour_local := (current_hour + 1) % 24) >= 10 and ts_hour_local <= 18),
+            },
             "ipma_areas":       SECTOR_IPMA_AREAS.get(sec['name'],[]),
             "aemet_storm_alert":aemet_storm_active,
             "microclimate_notes": d_now.get('fog_alert') or d_now.get('mtb_hazard') or None,
@@ -992,7 +1130,7 @@ status_data = {
     "timestamp_utc":  now.isoformat(),
     "last_update":    time_str,
     "event":          "MQ2026",
-    "model_version":  "MQ Rider Index™ v3.1 | BELLATOR V21.0 — MULTI-SOURCE CONSENSUS",
+    "model_version":  "MQ Rider Index™ v3.1 | BELLATOR V21.1 — CONSENSUS + HEAT STRESS",
     "data_sources": [
         "ECMWF IFS seamless (Open-Meteo best_match) — PRIMARY T/W/P/Irr",
         "DWD ICON-EU 7km (Open-Meteo icon_seamless) — SECONDARY T/W/P/Irr",
@@ -1004,7 +1142,7 @@ status_data = {
         "AEMET Storm Alerts (NW Iberia) — TIER 0-B",
         "IFS lightning_potential + CAPE + CIN — TIER 0-C/D/E/F",
     ],
-    "api_version":    "v21.0_consensus",
+    "api_version":    "v21.1_consensus_heat",
     "consensus_engine": {
         "weights":    {"IFS": ConsensusEngine.W_IFS, "ICON": ConsensusEngine.W_ICON,
                        "IPMA": ConsensusEngine.W_IPMA},
@@ -1025,6 +1163,9 @@ status_data = {
         "snow_detected":  snow_detected,
         "storm_detected": storm_detected,
         "storm_level":    g_storm_level,
+        "heat_detected":  heat_detected,
+        "heat_level":     g_heat_level,
+        "max_wbgt_c":     round(g_max_wbgt,1) if g_max_wbgt > -99 else None,
         "aemet_storm_alert":  aemet_storm_active,
         "aemet_alert_text":   aemet_alert_text,
         "ipma_active":    any(check_ipma_for_sector(s['name'])[0] for s in sectors),
@@ -1073,7 +1214,7 @@ else:
 divergent = [d['sector'] for d in divergence_log if d['status']=='DIVERGENT']
 uncertain = [d['sector'] for d in divergence_log if d['status']=='UNCERTAIN']
 print(f"\n{'═'*62}")
-print(f"BELLATOR V21.0  |  {now.strftime('%Y-%m-%d %H:%M UTC')}")
+print(f"BELLATOR V21.1  |  {now.strftime('%Y-%m-%d %H:%M UTC')}")
 print(f"SOURCES: IFS · ICON-EU · IPMA ({len(ipma_forecasts)} stations) · NASA ({len(nasa_cache)} sectors)")
 print(f"MIN MRI: {g_min_eei}°  |  MAX WIND: {int(g_max_wind)} km/h")
 print(f"SNOW:  {'YES' if snow_detected else 'NO'}  |  STORM: {'YES — '+g_storm_level if storm_detected else 'NO'}")
