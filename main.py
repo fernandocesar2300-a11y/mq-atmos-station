@@ -820,7 +820,7 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
     ax.add_patch(patches.Rectangle((0,0),0.03,1,transform=ax.transAxes,linewidth=0,facecolor=color))
 
     plt.text(0.08,0.80,sector['name'],color='white',fontsize=16,fontweight='bold',transform=ax.transAxes)
-    plt.text(0.08,0.68,f"{sector['desc']} | {sector['alt']}",color='#94a3b8',fontsize=8,fontweight='bold',transform=ax.transAxes)
+    plt.text(0.08,0.68,f"{sector['desc']} | {sector['alt']}",color='#94a3b8',fontsize=9,fontweight='bold',transform=ax.transAxes)
 
     if storm_level in ["EXTREME","SEVERE"]:   wm = "HAIL" if "HAIL" in status else "STORM"
     elif storm_level in ["HIGH","MODERATE"]:  wm = "⚡"
@@ -836,7 +836,7 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
                    "SEVERE STORM — AEMET","EXTREME STORM — AEMET"]
     mri_col = "#ffffff" if status in danger_list else "#38bdf8" if eei_now<d_now['temp'] else "#fca5a5"
     plt.text(0.92,0.55,f"MRI: {int(eei_now)}°",color=mri_col,fontsize=10,fontweight='bold',ha='right',transform=ax.transAxes)
-    plt.text(0.08,0.45,f"WIND {int(d_now['wind'])} km/h",color='#94a3b8',fontsize=7,transform=ax.transAxes)
+    plt.text(0.08,0.45,f"WIND {int(d_now['wind'])} km/h",color='#94a3b8',fontsize=9,transform=ax.transAxes)
 
     lp = (d_now.get('lightning_potential') or 0)
     if lp > 0.1:
@@ -856,7 +856,7 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
             n = div.get('sources_active',2)
             div_lbl = f"◈ {n}SRC AGREE"
             div_col = '#475569'
-        plt.text(0.08,0.35,div_lbl,color=div_col,fontsize=6,fontweight='bold',transform=ax.transAxes)
+        plt.text(0.08,0.35,div_lbl,color=div_col,fontsize=9,fontweight='bold',transform=ax.transAxes)
 
     plt.text(0.92,0.25,f" {status} ",color='white',fontsize=9,fontweight='bold',ha='right',
              bbox=dict(boxstyle="round,pad=0.4",fc=color,ec="none",alpha=0.9),transform=ax.transAxes)
@@ -875,15 +875,8 @@ def generate_card(sector, d_now, d_3h, d_6h, time_str,
     plt.text(0.95,0.09,f"+6H: {flabel(d_6h,sector['altitude_m'])} {int(d_6h['temp'])}° {arrow(eei_now,eei_6h)}",
              color='#94a3b8',fontsize=9,fontweight='bold',ha='right',transform=ax.transAxes)
 
-    # Footer — consensus status inline
-    if div:
-        ds = div.get('status','AGREE')
-        ft_col = '#475569' if ds=='AGREE' else '#f1c40f' if ds=='UNCERTAIN' else '#e67e22'
-        footer = f"UPDATED: {time_str} UTC  |  {ds}  |  IFS·ICON·IPMA  |  BELLATOR V21.1"
-    else:
-        ft_col = '#475569'
-        footer = f"UPDATED: {time_str} UTC  |  MQ RIDER INDEX™ v3.1  |  BELLATOR V21.1"
-    plt.text(0.5,0.02,footer,color=ft_col,fontsize=5.5,ha='center',transform=ax.transAxes)
+    # Footer line removed (V21.1): UPDATED/AGREE/BELLATOR now lives in the legible
+    # HTML widget footer — was duplicated and illegible at 5.5pt inside the PNG.
 
     ax.axis('off')
     plt.savefig(f"{OUTPUT_FOLDER}MQ_SECTOR_{sector['id']}_STATUS.png",dpi=150,facecolor='#0f172a')
