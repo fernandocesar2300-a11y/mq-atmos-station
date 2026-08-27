@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MQ BIOS™ V55 - Lyapunov-Marcora Defiance Protocol</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        :root {
+            --mq-gold: #D4AF37;
+            --mq-red: #FF3333;
+            --mq-blue: #3498db;
+            --mq-purple: #9b59b6;
+            --mq-grey: #7f8c8d;
+            --mq-dark: #050505;
+            --mq-panel: #111;
+            --mq-border: #333;
+            --mq-orange: #ff6b00;
+        }
+        body { background: #000; color: #e0e0e0; margin: 0; padding: 20px 10px; font-family: 'Montserrat', sans-serif; overflow-x: hidden; }
+        #mq-container {
+            background-color: var(--mq-dark);
+            border: 1px solid var(--mq-border);
+            max-width: 1000px; margin: 0 auto;
+            border-radius: 2px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        /* Sombreado blanco eliminado */
+        #mq-container::before {
+            display: none;
+        }
+        #mq-container.mode-nominal { border-color: #333; }
+        #mq-container.mode-failure { border-color: var(--mq-red); box-shadow: 0 0 50px rgba(255, 51, 51, 0.15); }
+        #mq-container.mode-cut { border-color: var(--mq-blue); box-shadow: 0 0 50px rgba(52, 152, 219, 0.15); }
+        #mq-container.mode-vomit { border-color: var(--mq-purple); box-shadow: 0 0 50px rgba(155, 89, 182, 0.15); }
+        #mq-container.mode-broken { border-color: var(--mq-grey); box-shadow: 0 0 50px rgba(127, 140, 141, 0.15); }
+        #mq-container.mode-warning { border-color: var(--mq-orange); box-shadow: 0 0 50px rgba(255, 107, 0, 0.15); }
+        .mq-header {
+            padding: 15px 20px; border-bottom: 2px solid var(--mq-gold);
+            display: flex; justify-content: space-between; align-items: center; background: #080808; position: relative; z-index: 11;
+        }
+        .mq-brand { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
+        .mq-brand span { color: var(--mq-gold); }
+        .mq-ver { font-family: 'Roboto Mono'; font-size: 0.6rem; color: #666; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; }
+        .bio-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 1px; background: #333; border-bottom: 1px solid #333; position: relative; z-index: 11;
+        }
+        .bio-cell {
+            background: #111; padding: 15px; display: flex; flex-direction: column;
+        }
+        .bio-label {
+            font-family: 'Roboto Mono'; font-size: 0.55rem; color: #888; text-transform: uppercase; margin-bottom: 5px;
+        }
+        .bio-input, .bio-select {
+            background: transparent; border: none; color: #fff; font-family: 'Roboto Mono';
+            font-size: 1.1rem; font-weight: 700; width: 100%; outline: none; padding: 0;
+            appearance: none; -moz-appearance: none; -webkit-appearance: none;
+        }
+        .bio-select { cursor: pointer; color: var(--mq-gold); }
+        .bio-input:focus, .bio-select:focus { color: var(--mq-gold); }
+        .nav-scroller {
+            overflow-x: auto; white-space: nowrap; background: #0a0a0a;
+            padding: 10px 10px 10px 25px; border-bottom: 1px solid #333; -webkit-overflow-scrolling: touch; position: relative; z-index: 11;
+        }
+        .sector-tab {
+            display: inline-block; vertical-align: top;
+            background: #151515; border: 1px solid #333;
+            width: 140px; padding: 15px 10px; margin-right: 8px;
+            border-radius: 2px; cursor: pointer; transition: all 0.2s;
+            position: relative;
+            font-family: 'Roboto Mono', monospace;
+        }
+        .sector-tab.active { background: var(--mq-gold); color: #000; border-color: var(--mq-gold); transform: translateY(2px); }
+        .sector-tab.active .tab-meta { color: #222; font-weight: bold; }
+        .sector-tab.warning { border-color: var(--mq-orange); box-shadow: 0 0 10px rgba(255, 107, 0, 0.3); }
+        .tab-name { display: block; font-size: 0.6rem; font-weight: 900; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
+        .tab-meta { display: block; font-size: 0.55rem; font-family: 'Roboto Mono'; color: #666; margin-top: 4px; }
+        .tab-spd {
+            position: absolute; top: 5px; right: 5px; font-family: 'Roboto Mono'; font-size: 0.5rem;
+            background: #000; color: #fff; padding: 1px 3px; border-radius: 2px;
+        }
+        .tab-warn {
+            position: absolute; top: 5px; left: 5px; font-size: 0.8rem;
+        }
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; min-height: 420px; position: relative; z-index: 11; }
+        @media (max-width: 800px) { .dashboard { grid-template-columns: 1fr; } }
+        .panel-controls { padding: 30px; border-right: 1px solid #333; background: #0e0e0e; display: flex; flex-direction: column; gap: 30px; }
+        .panel-diag { padding: 0; background: #050505; display: flex; align-items: stretch; justify-content: center; }
+        .control-block h4 { margin: 0 0 10px 0; color: var(--mq-gold); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+        .speed-control-wrapper {
+            display: flex; align-items: center; gap: 15px;
+            background: #1a1a1a; padding: 15px; border-radius: 4px; border: 1px solid #333;
+        }
+        .btn-adj {
+            width: 44px; height: 44px; background: #222; border: 1px solid #444; color: #fff;
+            font-size: 1.4rem; font-weight: bold; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; user-select: none;
+            transition: background 0.1s;
+        }
+        .btn-adj:active { background: var(--mq-gold); color: #000; }
+        .slider-container { flex-grow: 1; text-align: center; }
+        .current-speed { display: block; font-size: 1.8rem; font-weight: 900; font-family: 'Roboto Mono'; line-height: 1; }
+        .current-speed span { font-size: 0.8rem; color: #666; font-weight: normal; }
+        input[type=range] { width: 100%; margin-top: 10px; accent-color: var(--mq-gold); height: 6px; background: #333; border-radius: 3px; cursor: pointer; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .metric-box { background: #151515; padding: 15px 10px; border: 1px solid #333; text-align: center; }
+        .m-val { display: block; font-size: 1.2rem; font-weight: 900; font-family: 'Roboto Mono'; }
+        .m-lbl { display: block; font-size: 0.6rem; color: #777; text-transform: uppercase; margin-top: 5px; letter-spacing: 1px; }
+        .diag-card {
+            border: none; width: 100%; height: 100%; padding: 40px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+            background: #000; position: relative; overflow: hidden;
+        }
+        .diag-card::after {
+            content: ""; position: absolute; top:0; left:0; width:100%; height:100%;
+            background-image: radial-gradient(#222 1px, transparent 1px); background-size: 20px 20px;
+            opacity: 0.3; pointer-events: none; z-index: 1;
+        }
+        .diag-icon { font-size: 4rem; margin-bottom: 20px; z-index: 2; text-shadow: 0 0 20px rgba(255,255,255,0.1); }
+        .diag-head { font-size: 1.4rem; font-weight: 900; text-transform: uppercase; margin-bottom: 15px; z-index: 2; line-height: 1.1; letter-spacing: 1px; }
+        .diag-body { font-size: 0.95rem; color: #bbb; line-height: 1.6; z-index: 2; max-width: 90%; }
+        .diag-pt { margin-top: 20px; padding-top: 15px; border-top: 1px solid #333; color: #666; font-style: italic; z-index: 2; display: block; font-size: 0.9rem; }
+        .tx-ok { color: #28a745; }
+        .tx-warn { color: var(--mq-orange); text-shadow: 0 0 15px var(--mq-orange); }
+        .tx-fail { color: var(--mq-red); text-shadow: 0 0 15px var(--mq-red); }
+        .tx-cut { color: var(--mq-blue); text-shadow: 0 0 15px var(--mq-blue); }
+        .tx-vomit { color: var(--mq-purple); text-shadow: 0 0 15px var(--mq-purple); }
+        .tx-broken { color: var(--mq-grey); }
+        .mq-footer {
+            background: #080808; padding: 20px 30px; border-top: 1px solid #333; position: relative; z-index: 11;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;
+        }
+        .global-stat { font-family: 'Roboto Mono'; font-size: 0.8rem; color: #888; }
+        .global-stat strong { color: #fff; font-size: 1rem; margin-left: 5px; }
+        .global-stat.defiance { color: var(--mq-orange); }
+        .global-stat.defiance strong { color: var(--mq-orange); font-size: 1.3rem; }
+        .btn-action {
+            background: transparent; border: 1px solid #444; color: #aaa;
+            padding: 12px 25px; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-action:hover { border-color: var(--mq-gold); color: var(--mq-gold); background: rgba(212, 175, 55, 0.05); }
+        .mq-disclaimer { background: #000; padding: 15px; text-align: center; border-top: 1px solid #222; font-size: 0.6rem; color: #444; text-transform: uppercase; letter-spacing: 1px; font-family: 'Roboto Mono'; position: relative; z-index: 11; }
+        #print-report { display: none; background: #fff; color: #000; padding: 40px; font-family: 'Roboto Mono'; width: 100%; min-height: 100vh; position: absolute; top: 0; left: 0; z-index: 9999; }
+        body.printing #mq-container { display: none; }
+        body.printing #print-report { display: block; }
+        .rpt-row { display: flex; border-bottom: 1px solid #ccc; padding: 8px 0; }
+        .rpt-cell { flex: 1; font-size: 0.8rem; }
+        .rpt-head { font-weight: bold; border-bottom: 2px solid #000; }
+        .rpt-stamp { border: 3px solid #000; display: inline-block; padding: 10px 20px; font-weight: 900; margin-top: 30px; transform: rotate(-2deg); font-size: 1.5rem; }
+        .rpt-warning { background: #fff3cd; border-left: 4px solid #ff6b00; padding: 15px; margin: 20px 0; font-size: 0.85rem; }
+        .rpt-warning strong { color: #ff6b00; display: block; margin-bottom: 5px; font-size: 1rem; }
+        .stem-cutout { border: 2px dashed #666; margin-top: 30px; padding: 15px; background: #f0f0f0; max-width: 320px; }
+        .stem-header { font-weight: 900; font-size: 0.9rem; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px; }
+        .stem-row { display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid #ccc; padding: 2px 0; }
+        @media print {
+            body { background: #fff !important; margin: 0 !important; color: #000 !important; padding: 0 !important; }
+            #mq-container { display: none !important; }
+            #print-report { display: block !important; position: static; }
+            button { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+<div id="mq-container" class="mode-nominal">
+    <div class="mq-header">
+        <div class="mq-brand">MQ <span>BIOS™</span></div>
+        <div class="mq-ver">LYAPUNOV-MARCORA DEFIANCE PROTOCOL V55</div>
+    </div>
+    <div class="bio-grid">
+        <div class="bio-cell">
+            <span class="bio-label">WEIGHT (KG)</span>
+            <input type="number" id="in-weight" class="bio-input" value="75">
+        </div>
+        <div class="bio-cell">
+            <span class="bio-label">HEIGHT (CM)</span>
+            <input type="number" id="in-height" class="bio-input" value="180">
+        </div>
+        <div class="bio-cell">
+            <span class="bio-label">BIKE WT (KG)</span>
+            <input type="number" id="in-bike-weight" class="bio-input" value="9">
+        </div>
+        <div class="bio-cell">
+            <span class="bio-label">FTP (W)</span>
+            <input type="number" id="in-ftp" class="bio-input" value="260">
+        </div>
+        <div class="bio-cell">
+            <span class="bio-label">CARBS (G/H)</span>
+            <input type="number" id="in-carbs" class="bio-input" value="60">
+        </div>
+        <div class="bio-cell" style="flex:1.5;">
+            <span class="bio-label">ATMOS CONDITION</span>
+            <select id="in-weather" class="bio-select">
+                <option value="neutral">NEUTRAL (20°C)</option>
+                <option value="heat">HEATWAVE (35°C)</option>
+                <option value="storm">STORM (MUD/WIND)</option>
+            </select>
+        </div>
+    </div>
+    <div class="nav-scroller" id="tabs-container"></div>
+    <div class="dashboard">
+        <div class="panel-controls">
+            <div class="control-block">
+                <h4 id="seg-name">LOADING...</h4>
+                <div style="font-size:0.7rem; color:#666; font-family:'Roboto Mono';" id="seg-details">...</div>
+            </div>
+            <div class="control-block">
+                <h4>TARGET SPEED (VELOCIDADE)</h4>
+                <div class="speed-control-wrapper">
+                    <div class="btn-adj" onclick="MQ_Engine.adjustSpeed(-0.5)">−</div>
+                    <div class="slider-container">
+                        <span class="current-speed" id="disp-speed">12.0 <span>km/h</span></span>
+                        <input type="range" id="inp-speed" min="3" max="30" step="0.5" oninput="MQ_Engine.setSpeed(this.value)">
+                    </div>
+                    <div class="btn-adj" onclick="MQ_Engine.adjustSpeed(0.5)">+</div>
+                </div>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <span class="m-val" id="m-watts">0</span>
+                    <span class="m-lbl">WATTS (REQ)</span>
+                </div>
+                <div class="metric-box">
+                    <span class="m-val" id="m-if">0.00</span>
+                    <span class="m-lbl">INTENSITY (IF)</span>
+                </div>
+                <div class="metric-box">
+                    <span class="m-val" id="m-time">00:00</span>
+                    <span class="m-lbl">DURATION</span>
+                </div>
+                <div class="metric-box">
+                    <span class="m-val" id="m-eta">00:00</span>
+                    <span class="m-lbl">ARRIVAL TIME</span>
+                </div>
+            </div>
+        </div>
+        <div class="panel-diag">
+            <div class="diag-card" id="diag-card">
+                <div class="diag-icon" id="d-icon">🛡️</div>
+                <div class="diag-head" id="d-title">SYSTEM ONLINE</div>
+                <div class="diag-body" id="d-msg">Analyzing telemetry...</div>
+                <span class="diag-pt" id="d-pt">A carregar dados...</span>
+            </div>
+        </div>
+    </div>
+    <div class="mq-footer">
+        <div class="global-stat">TOTAL: <strong id="g-time">00h 00m</strong></div>
+        <div class="global-stat">DEFICIT: <strong id="g-def">0</strong></div>
+        <div class="global-stat">MIND: <strong id="g-mind">100%</strong></div>
+        <div class="global-stat defiance">DEFIANCE: <strong id="g-defiance">0</strong></div>
+        <button class="btn-action" onclick="MQ_Engine.printReport()">PRINT BRIEFING</button>
+    </div>
+    <div class="mq-disclaimer">
+        SIMULATION BASED ON OFFICIAL RUTOMETER. "A MATEMÁTICA NÃO PEDALA POR TI." // PROVE US WRONG.
+    </div>
+</div>
+<div id="print-report">
+    <div style="border-bottom:4px solid #000; padding-bottom:10px; margin-bottom:20px;">
+        <h1 style="margin:0; font-size:2rem;">MQ MISSION BRIEFING</h1>
+        <div style="font-size:0.8rem; margin-top:5px; font-family:'Roboto Mono';">
+            PROTOCOL: <b>LYAPUNOV-MARCORA DEFIANCE V55</b> | DATE: 20/06/2026
+        </div>
+    </div>
+    <div style="font-family:'Roboto Mono'; font-size:0.9rem; margin-bottom:30px; background:#eee; padding:10px;">
+        PILOT DATA: <span id="r-data">--</span>
+    </div>
+    <div id="r-warnings"></div>
+    <div style="display:flex; gap:40px; flex-wrap:wrap;">
+        <div style="flex:2; min-width:300px;">
+            <div class="rpt-row rpt-head">
+                <div class="rpt-cell" style="flex:2">SECTOR</div>
+                <div class="rpt-cell">SPD</div>
+                <div class="rpt-cell">TIME</div>
+                <div class="rpt-cell">ETA</div>
+                <div class="rpt-cell">STATUS</div>
+            </div>
+            <div id="rpt-body"></div>
+            <div style="margin-top:20px; font-weight:bold;">VERDICT:</div>
+            <div class="rpt-stamp" id="r-stamp">APPROVED</div>
+            <div style="margin-top:30px; padding:15px; background:#f8f9fa; border-left:4px solid #ff6b00;">
+                <strong style="color:#ff6b00; font-size:0.9rem;">DEFIANCE SCORE: <span id="r-defiance">0</span></strong>
+                <p style="margin:10px 0 0 0; font-size:0.75rem; color:#666;" id="r-defiance-msg">Analysis pending...</p>
+            </div>
+        </div>
+        <div style="flex:1; min-width:250px;">
+            <div class="stem-cutout">
+                <div class="stem-header">✂️ STEM STICKER</div>
+                <div id="stem-body"></div>
+                <div style="text-align:center; font-size:0.6rem; margin-top:10px;">MOUNTAINQUEST.PT</div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top:50px; text-align:center;">
+        <button onclick="window.print()" style="padding:15px 30px; font-weight:900; cursor:pointer; background:#000; color:#fff; border:none;">PRINT NOW</button>
+        <button onclick="window.location.reload()" style="padding:15px 30px; margin-left:10px; cursor:pointer; background:#fff; border:2px solid #000;">BACK</button>
+    </div>
+</div>
+<script>
+const MQ_Engine = {
+    idx: 0,
+    sectors: [
+        { name: "Start & Aboboreira", dist: 42, elev: 2000, crr: 1.6, cut: 10.5, speed: 12, type: "climb_start", mental_cost: 15, km_start: 0, km_end: 42 },
+        { name: "Mafómedes & Ferraria", dist: 33, elev: 1300, crr: 1.5, cut: null, speed: 6, type: "wall", mental_cost: 25, km_start: 42, km_end: 75 },
+        { name: "Marão & Gavião", dist: 18, elev: 400, crr: 1.8, cut: 15.5, speed: 6, type: "tech", mental_cost: 15, km_start: 75, km_end: 93 },
+        { name: "Cabana / Cravelas", dist: 37, elev: 1100, crr: 1.3, cut: 19.5, speed: 10, type: "roll", mental_cost: 10, km_start: 93, km_end: 130 },
+        { name: "Senhora da Graça", dist: 30, elev: 800, crr: 1.2, cut: null, speed: 8, type: "climb_final", mental_cost: 20, km_start: 130, km_end: 160 },
+        { name: "Champs-Élysées", dist: 42, elev: 600, crr: 1.1, cut: 24.0, speed: 16, type: "finish", mental_cost: 10, km_start: 160, km_end: 202 }
+    ],
+    debounceTimer: null,
+    weatherCache: '',
+    globalState: { failMode: null, failSectorIndex: -1, cognitiveReserve: 100, defianceScore: 0, warnings: [] },
+
+    init: function() {
+        this.bindInputs();
+        this.renderTabs();
+        this.calculate();
+        this.updateControlPanel();
+        this.initTrollDefense();
+    },
+    bindInputs: function() {
+        const inputs = ['in-weight', 'in-height', 'in-bike-weight', 'in-ftp', 'in-carbs', 'in-weather'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.addEventListener('input', () => this.debounceCalculate());
+            }
+        });
+    },
+    debounceCalculate: function() {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => this.calculate(), 300);
+    },
+    initTrollDefense: function() {
+        const numberInputs = document.querySelectorAll('input[type="number"]');
+        let trollTimer;
+        numberInputs.forEach(input => {
+            input.addEventListener('input', function() {
+                clearTimeout(trollTimer);
+                const el = this;
+                trollTimer = setTimeout(() => {
+                    const val = parseFloat(el.value);
+                    if (el.value !== "" && !isNaN(val)) {
+                        let isTroll = false;
+                        if (val < 0) isTroll = true;
+                        if (el.id === 'in-ftp' && val < 50) isTroll = true;
+                        if (el.id === 'in-weight' && val < 40) isTroll = true;
+                        if (el.id === 'in-carbs' && val < 0) isTroll = true;
+                        if (isTroll) {
+                            const troll = document.createElement('div');
+                            troll.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;padding:40px;z-index:9999;text-align:center;font-family:"Montserrat";border:3px solid #d4af37;border-radius:4px;box-shadow:0 0 80px rgba(0,0,0,1); width:90%; max-width:400px;';
+                            troll.innerHTML = `<div style="font-size:4rem;">🤏</div><div style="color:#d4af37;font-size:1.8rem;margin:20px 0;font-weight:900;">DON'T TOUCH THE BALLS</div><div style="color:#e74c3c;font-size:0.9rem;font-family:'Roboto Mono';">Values reset. Don't lie to the BIOS.</div>`;
+                            document.body.appendChild(troll);
+                            setTimeout(() => troll.remove(), 3000);
+                            el.value = '';
+                            MQ_Engine.calculate();
+                        }
+                    }
+                }, 1500);
+            });
+        });
+    },
+    renderTabs: function() {
+        const c = document.getElementById('tabs-container');
+        const fragment = document.createDocumentFragment();
+        this.sectors.forEach((s, i) => {
+            const div = document.createElement('div');
+            let statusClass = (s.calc && s.calc.status !== 'OK') ? 'tab-failed' : '';
+            let warnClass = (s.warning) ? 'warning' : '';
+            div.className = `sector-tab ${i === this.idx ? 'active' : ''} ${statusClass} ${warnClass}`;
+            div.onclick = () => this.selectSector(i);
+
+            let warnIcon = s.warning ? '<span class="tab-warn">⚠️</span>' : '';
+            div.innerHTML = `${warnIcon}<span class="tab-spd">${s.speed.toFixed(1)}</span><span class="tab-name">${s.name}</span><span class="tab-meta">${s.dist}km | ${s.elev}m+</span>`;
+            fragment.appendChild(div);
+        });
+        c.innerHTML = '';
+        c.appendChild(fragment);
+    },
+    selectSector: function(i) {
+        this.idx = i;
+        this.renderTabs();
+        this.updateControlPanel();
+        this.updateDiagnosticPanel();
+    },
+    updateControlPanel: function() {
+        const s = this.sectors[this.idx];
+        document.getElementById('seg-name').innerText = s.name;
+        document.getElementById('seg-details').innerText = `${s.dist} KM / ${s.elev} M D+ / START: KM ${s.km_start}`;
+        document.getElementById('inp-speed').value = s.speed;
+        document.getElementById('disp-speed').innerHTML = `${s.speed.toFixed(1)} <span>km/h</span>`;
+    },
+    adjustSpeed: function(delta) {
+        let s = this.sectors[this.idx].speed + delta;
+        if(s < 3) s = 3; if(s > 40) s = 40;
+        this.setSpeed(s);
+    },
+    setSpeed: function(val) {
+        this.sectors[this.idx].speed = parseFloat(val);
+        document.getElementById('disp-speed').innerHTML = `${parseFloat(val).toFixed(1)} <span>km/h</span>`;
+        this.renderTabs();
+        this.calculate();
+    },
+    calculate: function() {
+        const w = parseFloat(document.getElementById('in-weight').value) || 75;
+        const bike_w = parseFloat(document.getElementById('in-bike-weight').value) || 9;
+        const total_w = w + bike_w;
+        const ftp = parseFloat(document.getElementById('in-ftp').value) || 250;
+        const carbs = parseFloat(document.getElementById('in-carbs').value) || 60;
+        const weather = document.getElementById('in-weather').value;
+        this.weatherCache = document.getElementById('in-weather').options[document.getElementById('in-weather').selectedIndex].text;
+
+        let currentTime = 5.0;
+        let accumulatedFatigue = 0;
+        let cognitiveReserve = 100;
+        let totalDeficit = 0;
+        let failMode = null;
+        let failSectorIndex = -1;
+        let defianceScore = 0;
+        let warnings = [];
+        let marcoraPressure = 0;
+
+        if(carbs > 120) {
+            failMode = 'vomit';
+            failSectorIndex = 0;
+        }
+
+        this.sectors.forEach((s, i) => {
+            s.warning = false;
+
+            const grade = s.elev / (s.dist * 1000);
+            const speedMs = s.speed / 3.6;
+
+            // FÍSICA
+            const pGrav = total_w * 9.81 * speedMs * grade;
+            let crr = s.crr;
+            if(weather === 'storm') crr *= 1.15;
+            const pRoll = total_w * 9.81 * speedMs * (crr * 0.01);
+            const pAero = 0.5 * 1.2 * 0.4 * Math.pow(speedMs, 3);
+
+            let sectorWatts = (pGrav + pRoll + pAero) * 1.15;
+            if(weather === 'heat' && (s.type === 'wall' || s.type === 'climb_final')) {
+                sectorWatts *= 1.12;
+            }
+            sectorWatts = Math.round(sectorWatts);
+
+            const duration = s.dist / s.speed;
+            const arrivalTime = currentTime + duration;
+
+            // FISIOLOGÍA
+            let baseFtp = ftp;
+            if(weather === 'heat') baseFtp *= 0.88;
+
+            let effectiveFtp = Math.max(50, baseFtp * (1 - accumulatedFatigue));
+            let intensity = sectorWatts / effectiveFtp;
+
+            // MARCORA: FactorMentalMarcora amplifica watts percibidos
+            let factorMarcora = 1 + (0.15 * (1 - Math.max(0, cognitiveReserve) / 100));
+            let perceivedWatts = sectorWatts * factorMarcora;
+            let perceivedIntensity = perceivedWatts / effectiveFtp;
+
+            // DEFIANCE SCORE
+            if(intensity > 1.0) defianceScore += 10;
+            if(intensity > 1.15) defianceScore += 15;
+            if(intensity > 1.3) defianceScore += 25;
+
+            // KM 60: INVISIBLE COLLAPSE (Mafómedes)
+            if(s.km_start <= 60 && s.km_end > 60) {
+                if(intensity > 0.95) {
+                    marcoraPressure += 15;
+                    s.warning = true;
+                    warnings.push({
+                        sector: "MAFÓMEDES (km 60)",
+                        issue: "INVISIBLE COLLAPSE INITIATED",
+                        detail: `Intensity ${intensity.toFixed(2)}. Plan shattered. You think recovery comes, but terrain lies. Mental reset incoming.`
+                    });
+                    defianceScore += 25;
+                }
+            }
+
+            // KM 110: A CAPELA DISILLUSION
+            if(s.km_start <= 110 && s.km_end > 110) {
+                if(intensity > 0.9 && accumulatedFatigue > 0.35) {
+                    marcoraPressure += 20;
+                    s.warning = true;
+                    warnings.push({
+                        sector: "A CAPELA (km 110)",
+                        issue: "HOPE BETRAYED",
+                        detail: `Expected recovery. Got punishment. 1km durissima when you believed it was over. Mental hit incoming.`
+                    });
+                    defianceScore += 30;
+                }
+            }
+
+            // KM 130: CATABATIC WINDS + CRAVELAS
+            if(s.km_start <= 130 && s.km_end > 130) {
+                // Simulate 19:00 arrival for Cravelas crossing
+                if(arrivalTime > 18.5) {
+                    if(intensity > 0.9) {
+                        marcoraPressure += 25;
+                        s.warning = true;
+                        warnings.push({
+                            sector: "CRAVELAS (km 130, ~19h)",
+                            issue: "CATABATIC WINDS + PHANTOM MUTANT",
+                            detail: `Vientos frios del Alvão. Última subida equivalente a Mafómedes. Solo food at Cabana but wind confuses body. Some break here.`
+                        });
+                        defianceScore += 35;
+                    }
+                }
+            }
+
+            // FATIGA
+            let fatigueHit = Math.pow(intensity, 3) * duration * 0.05;
+            accumulatedFatigue += fatigueHit;
+
+            // PSICOLOGÍA: drena mucho más si hay intensidad alta, duración larga y presión Marcora
+            let drain = s.mental_cost;
+
+            // Intensidad alta: castigo brutal
+            if (intensity > 0.9) drain *= 2.0;  // 2x el drenaje si estás por encima de 0.9
+            if (intensity > 1.0) drain *= 2.5;  // 2.5x si estás por encima de 1.0
+
+            // Sectores muy largos: castigo fuerte
+            if (duration > 4.0) drain += 10 + (duration - 4.0) * 5;  // +5 por cada hora extra
+
+            // Marcora: presión que duele
+            drain += (marcoraPressure * 0.6);  // Dobla el impacto de la presión Marcora
+
+            // Aplica el drenaje
+            cognitiveReserve -= drain;
+            if (cognitiveReserve < 0) cognitiveReserve = 0;
+
+            // ENERGÍA
+            const kj = sectorWatts * duration * 3.6;
+            const kcalBurn = kj * 1.1;
+            const kcalIn = carbs * 4 * duration;
+            totalDeficit += (kcalBurn - kcalIn);
+
+            // FAIL-SAFES
+            if (failMode === null) {
+                if((intensity > 1.3 || accumulatedFatigue > 0.70)) {
+                    failMode = 'phys';
+                    failSectorIndex = i;
+                }
+                else if(s.cut !== null && arrivalTime > s.cut) {
+                    failMode = 'cut';
+                    failSectorIndex = i;
+                }
+            }
+
+            s.calc = {
+                watts: sectorWatts,
+                if: intensity.toFixed(2),
+                time: duration,
+                arrival: arrivalTime,
+                status: (failMode && i >= failSectorIndex) ? 'DNF' : 'OK'
+            };
+
+            currentTime = arrivalTime;
+        });
+
+        // Final defiance modifiers
+        if(accumulatedFatigue > 0.6) defianceScore += 30;
+        if(totalDeficit > 2000) defianceScore += 20;
+        if(weather === 'heat' || weather === 'storm') defianceScore += 15;
+
+        const totalDuration = currentTime - 5.0;
+        document.getElementById('g-time').innerText = this.fmtDur(totalDuration);
+        document.getElementById('g-def').innerText = Math.round(totalDeficit) + ' kcal';
+
+        // MIND: color dinámico según presión Marcora
+        const mindEl = document.getElementById('g-mind');
+
+        // MAPPING VISUAL: no enseñamos la reserva real tal cual,
+        // sino una versión reescalada para que la aguja respire.
+        let rawMind = cognitiveReserve;            // 0–100 interno
+        if(rawMind < 0) rawMind = 0;
+        if(rawMind > 100) rawMind = 100;
+
+        let displayMind;
+
+        // Alto: si tienes >70 de reserva, nunca enseñamos menos de 80%
+        if(rawMind >= 70) {
+            // 70–100  ->  80–100
+            displayMind = 80 + (rawMind - 70) * (20 / 30);
+        }
+        // Medio: 20–70 de reserva se mapea a 20–80%
+        else if(rawMind >= 20) {
+            // 20–70  ->  20–80
+            displayMind = 20 + (rawMind - 20) * (60 / 50);
+        }
+        // Bajo: <20 de reserva, nunca enseñamos menos de 5%
+        else {
+            // 0–20  ->  5–20
+            displayMind = 5 + rawMind * (15 / 20);
+        }
+
+        displayMind = Math.round(displayMind);
+        mindEl.innerText = displayMind + '%';
+
+        // Colores por rango visual, no por valor crudo
+        if(displayMind >= 70) {
+            mindEl.style.color = '#00ff99'; // verde
+        } else if(displayMind >= 40) {
+            mindEl.style.color = '#ffcc33'; // amarillo
+        } else {
+            mindEl.style.color = '#ff3333'; // rojo
+        }
+
+        document.getElementById('g-defiance').innerText = Math.round(defianceScore);
+
+        if(failMode === null && cognitiveReserve < 20) {
+            failMode = 'broken';
+            failSectorIndex = 5;
+        }
+
+        this.globalState = { failMode, failSectorIndex, cognitiveReserve, defianceScore: Math.round(defianceScore), warnings };
+        this.updateDiagnosticPanel();
+        this.updateMetrics();
+        this.renderTabs();
+    },
+    updateMetrics: function() {
+        const curr = this.sectors[this.idx].calc;
+        document.getElementById('m-watts').innerText = curr.watts;
+        document.getElementById('m-if').innerText = curr.if;
+        document.getElementById('m-if').style.color = parseFloat(curr.if) > 0.9 ? 'var(--mq-red)' : '#fff';
+        document.getElementById('m-time').innerText = this.fmtDur(curr.time);
+        document.getElementById('m-eta').innerText = this.fmtTime(curr.arrival);
+    },
+    updateDiagnosticPanel: function() {
+        const container = document.getElementById('mq-container');
+        const state = this.globalState || {};
+        const failMode = state.failMode;
+        const failIdx = state.failSectorIndex;
+        const s = this.sectors[this.idx];
+
+        container.className = "";
+        let showFailure = false;
+        if(failMode === 'vomit') showFailure = true;
+        else if(failMode && this.idx >= failIdx) showFailure = true;
+
+        if(s.warning && !showFailure) {
+            container.classList.add("mode-warning");
+        }
+
+        if(showFailure) {
+            if(failMode === 'vomit') {
+                container.classList.add("mode-vomit");
+                this.setDiag("🤢", "BIOLOGICAL FAILURE", "Carb overload (>120g/h). Gastro shutdown.", "Sobredose de hidratos. O estômago parou. Vais vomitar tudo.");
+            } else if(failMode === 'phys') {
+                container.classList.add("mode-failure");
+                this.setDiag("💥", "CRITICAL FAILURE: ESTOIRO", "System overload. Engine blown. Solo DNF predicted.", "SIUUUUUUH! Motor rebentado. Sozinho, não passas. O Espírito da Coisa é a tua única salvação. Encontra o teu grupo ou morre a tentar.");
+            } else if(failMode === 'cut') {
+                container.classList.add("mode-cut");
+                this.setDiag("⏳", "TIME LIMIT EXCEEDED", "Failed to beat the clock. Game Over.", "Game over, man! Game over! A barreira horária fechou. A aventura acabou.");
+            } else if(failMode === 'broken') {
+                container.classList.add("mode-broken");
+                this.setDiag("⚠️", "FINISHER - BROKEN MIND", "Willpower critical (<20%). Mutant denied.", "Sobreviveste à MQ. Mas a cabeça está vazia. O Mutante fica para o ano. Vai comer a sopa.");
+            }
+        } else {
+            container.classList.add("mode-nominal");
+
+            if(this.idx===0) {
+                this.setDiag("🧠", "BE SMART", "It's a long day. Don't burn matches early.", "Tem juízo. A prova não se ganha na Aboboreira.");
+            }
+            else if(this.idx===1) {
+                const intensity = parseFloat(s.calc.if);
+                if(intensity > 1.0) {
+                    this.setDiag("⚠️", "WARNING: MAFÓMEDES OVERLOAD",
+                        `Intensity ${intensity.toFixed(2)}. Ferraria Wall incoming. You WILL cramp. Slow down NOW.`,
+                        `Intensidade ${intensity.toFixed(2)}. Mafómedes é interminável. Reduz AGORA.`);
+                } else {
+                    this.setDiag("🔨", "MARRETALAND", "Mafómedes: The endless climb. Ferraria Wall ahead.", "Aqui é que a porca torce o rabo.");
+                }
+            }
+            else if(this.idx===2) {
+                const fatigue = this.globalState.warnings.find(w => w.sector.includes("INVISIBLE"));
+                if(fatigue) {
+                    this.setDiag("🌬️", "CRITICAL: GAVIÃO INCOMING",
+                        "The Gauntlet. Most riders blow up HERE. You've been warned.",
+                        "O trecho maldito. Aqui explodem quase todos. O Gavião não perdoa.");
+                } else {
+                    this.setDiag("🌬️", "EXPOSURE", "Marão summit. High winds likely.", "O Marão manda.");
+                }
+            }
+            else if(this.idx===3) {
+                this.setDiag("🍖", "FUEL UP", "Cabana resupply point. Eat solid food or die.", "Come uma sandes de pernil ou não chegas.");
+            }
+            else if(this.idx===4) {
+                this.setDiag("⛪", "THE TEMPLE", "Senhora da Graça. The final boss. If you reach here, you can finish.", "A Senhora da Graça espera por ti. Sofre em silêncio.");
+            }
+            else if(this.idx===5) {
+                this.setDiag("🏁", "GLORY ROAD", "Finish line ahead. Stay focused. The Mutant awaits.", "Já cheira a meta. O Mutante espera pelos bravos.");
+            }
+        }
+    },
+    setDiag: function(icon, title, en, pt) {
+        document.getElementById('d-icon').innerText = icon;
+        document.getElementById('d-title').innerText = title;
+        document.getElementById('d-msg').innerText = en;
+        document.getElementById('d-pt').innerText = pt;
+
+        const titleEl = document.getElementById('d-title');
+        const iconEl = document.getElementById('d-icon');
+
+        titleEl.className = "diag-head";
+        iconEl.className = "diag-icon";
+
+        if(title.includes("WARNING")) { titleEl.classList.add("tx-warn"); iconEl.classList.add("tx-warn"); }
+        else if(title.includes("ESTOIRO") || title.includes("CRITICAL FAILURE")) { titleEl.classList.add("tx-fail"); iconEl.classList.add("tx-fail"); }
+        else if(title.includes("TIME")) { titleEl.classList.add("tx-cut"); iconEl.classList.add("tx-cut"); }
+        else if(title.includes("BIOLOGICAL")) { titleEl.classList.add("tx-vomit"); iconEl.classList.add("tx-vomit"); }
+        else if(title.includes("BROKEN")) { titleEl.classList.add("tx-broken"); iconEl.classList.add("tx-broken"); }
+        else { titleEl.classList.add("tx-ok"); iconEl.classList.add("tx-ok"); }
+    },
+    fmtTime: function(val) {
+        let h = Math.floor(val);
+        let m = Math.round((val - h) * 60);
+        if(h >= 24) h -= 24;
+        return `${h}:${m < 10 ? '0'+m : m}`;
+    },
+    fmtDur: function(val) {
+        let h = Math.floor(val);
+        let m = Math.round((val - h) * 60);
+        return `${h}h ${m}m`;
+    },
+    printReport: function() {
+        document.body.classList.add('printing');
+        const rptBody = document.getElementById('rpt-body');
+        const stemBody = document.getElementById('stem-body');
+        const rptWarnings = document.getElementById('r-warnings');
+        let html = '';
+        let stemHtml = '';
+        let warningsHtml = '';
+
+        if(this.globalState.warnings.length > 0) {
+            warningsHtml += '<div class="rpt-warning"><strong>⚠️ CRITICAL SECTORS DETECTED</strong>';
+            this.globalState.warnings.forEach(w => {
+                warningsHtml += `<div style="margin-top:8px;"><strong>${w.sector}:</strong> ${w.detail}</div>`;
+            });
+            warningsHtml += '</div>';
+        }
+        rptWarnings.innerHTML = warningsHtml;
+
+        this.sectors.forEach(s => {
+            html += `<div class="rpt-row"><div class="rpt-cell" style="flex:2"><b>${s.name}</b></div><div class="rpt-cell">${s.speed} km/h</div><div class="rpt-cell">${this.fmtDur(s.calc.time)}</div><div class="rpt-cell">${this.fmtTime(s.calc.arrival)}</div><div class="rpt-cell"><b>${s.calc.status}</b></div></div>`;
+            let shortName = s.name.split(' ')[0].substring(0,10);
+            stemHtml += `<div class="stem-row"><span>${shortName}</span><span>${this.fmtTime(s.calc.arrival)}</span></div>`;
+        });
+
+        rptBody.innerHTML = html;
+        stemBody.innerHTML = stemHtml;
+
+        const w = document.getElementById('in-weight').value;
+        const bike_w = document.getElementById('in-bike-weight').value;
+        const ftp = document.getElementById('in-ftp').value;
+        document.getElementById('r-data').innerText = `WT: ${w}KG | BIKE: ${bike_w}KG | FTP: ${ftp}W | COND: ${this.weatherCache}`;
+
+        const stamp = document.getElementById('r-stamp');
+        const state = this.globalState || {};
+        const defScore = state.defianceScore || 0;
+        document.getElementById('r-defiance').innerText = defScore;
+        const defMsg = document.getElementById('r-defiance-msg');
+
+        if(defScore < 30) {
+            defMsg.innerText = "You shall not pass.";
+            stamp.innerText = "GO";
+        } else if(defScore < 80) {
+            defMsg.innerText = "Overcome the Impossible.";
+            stamp.innerText = "CAUTION";
+        } else if(defScore < 150) {
+            defMsg.innerText = "Redefining limits.";
+            stamp.innerText = "RISKY";
+        } else {
+            defMsg.innerText = "Redefining limits.";
+            stamp.innerText = "DNF";
+        }
+    }
+};
+
+MQ_Engine.init();
+</script>
+</body>
+</html>
