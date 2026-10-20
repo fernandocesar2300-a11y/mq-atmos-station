@@ -1,4 +1,5 @@
-gpxpy
-matplotlib
-requests
-folium
+requests>=2.31
+pyyaml>=6.0
+matplotlib>=3.8
+gpxpy>=1.6
+pytest>=8.0

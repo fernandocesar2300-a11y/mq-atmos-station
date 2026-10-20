@@ -1,0 +1,37 @@
+name: DSS FIELD · ATMOS
+on:
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"   # :x7 — GitHub delays :00 jobs
+  workflow_dispatch:
+    inputs:
+      event: { description: "events/<name>.yaml", default: "events/mq.yaml" }
+concurrency:
+  group: atmos-${{ github.event.inputs.event || 'events/mq.yaml' }}
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt
+      - name: Restore last products (for degraded fallback)
+        uses: actions/cache@v4
+        with:
+          path: output
+          key: atmos-output-${{ github.run_id }}
+          restore-keys: atmos-output-
+      - run: python -m pytest -q
+      - name: Run engine
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+        run: python -m atmos.run --event "${{ github.event.inputs.event || 'events/mq.yaml' }}" --products status,field --publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: atmos-output, path: output, retention-days: 30 }

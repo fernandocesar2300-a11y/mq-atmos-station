@@ -1,6 +1,6 @@
 """
 ═══════════════════════════════════════════════════════════════════════════
-MQ ATMOS LAB: IPMA CALIBRATION v1.0
+MQ ATMOS LAB: IPMA CALIBRATION v1.1 (points from events/mq.yaml, -99 sentinel, IFS reference)
 ═══════════════════════════════════════════════════════════════════════════
 Genera aemet_corrections.json con offsets reais de estações IPMA portuguesas.
 
@@ -33,14 +33,12 @@ print("📡 IPMA CALIBRATION v1.0 — INICIANDO...")
 # SECTORES MQ (espelho de main.py)
 # ═══════════════════════════════════════════════════════════════════════════
 
-SECTORS = [
-    {"id": 1, "name": "AMARANTE",         "lat": 41.2709, "lon": -8.0797, "altitude_m": 65},
-    {"id": 2, "name": "S. DA ABOBOREIRA", "lat": 41.1946, "lon": -8.0563, "altitude_m": 760},
-    {"id": 3, "name": "SERRA DO MARÃO",   "lat": 41.2484, "lon": -7.8862, "altitude_m": 1415},
-    {"id": 4, "name": "GAVIÃO",           "lat": 41.2777, "lon": -7.9462, "altitude_m": 900},
-    {"id": 5, "name": "SERRA DO ALVÃO",   "lat": 41.3738, "lon": -7.8053, "altitude_m": 1200},
-    {"id": 6, "name": "SRA. GRAÇA",       "lat": 41.4168, "lon": -7.9106, "altitude_m": 950},
-]
+# Points come from events/mq.yaml (single source of truth; the old inline list
+# had altitudes that did not match the engine).
+import yaml as _yaml
+with open(os.environ.get("ATMOS_EVENT", "events/mq.yaml"), encoding="utf-8") as _f:
+    SECTORS = [{"id": p["id"], "name": p["name"], "lat": p["lat"], "lon": p["lon"], "altitude_m": p["altitude_m"]}
+               for p in _yaml.safe_load(_f)["points"]]
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HAVERSINE
@@ -135,11 +133,14 @@ def fetch_ipma_observations():
             if params is None:
                 continue
             try:
+                def _v(x):
+                    # IPMA uses -99.0 as missing sentinel; treat as None
+                    return None if x is None or float(x) <= -90 else float(x)
                 obs[int(station_id)] = {
-                    "temp":     params.get("temperatura"),
-                    "wind":     params.get("intensidadeVentoKM"),
-                    "rain":     params.get("precAcumulada"),
-                    "hum":      params.get("humidade"),
+                    "temp":     _v(params.get("temperatura")),
+                    "wind":     _v(params.get("intensidadeVentoKM")),
+                    "rain":     _v(params.get("precAcumulada")),
+                    "hum":      _v(params.get("humidade")),
                     "timestamp": latest_ts
                 }
             except (ValueError, TypeError):
@@ -167,7 +168,7 @@ def fetch_openmeteo_now(lat, lon):
             f"https://api.open-meteo.com/v1/forecast"
             f"?latitude={lat}&longitude={lon}"
             f"&hourly=temperature_2m,windspeed_10m,relativehumidity_2m"
-            f"&forecast_days=1"
+            f"&forecast_days=1&timezone=UTC&models=ecmwf_ifs025"   # same primary model as the engine
         )
         r = requests.get(url, timeout=10)
         r.raise_for_status()

@@ -1,0 +1,12 @@
+slug: terranorte
+name: Terra Norte
+timezone: Europe/Lisbon
+event_date: 2026-10-17
+publish_dir: atmos/terranorte
+window: { start_local: 8, end_local: 20 }
+thresholds: { rain_mmh: 0.5, gust_kmh: 45, cold_c: 8, heat_c: 26 }
+points:
+  - { id: 1, name: VILA REAL,       lat: 41.30010, lon: -7.74320, altitude_m: 464,  terrain: FLAT,  description: PARTIDA / META, ipma_areas: [VRL], ipma_station_gid: 1171400, ipma_station_alt: 460 }
+  - { id: 2, name: VREIA DE JALES,  lat: 41.43633, lon: -7.59172, altitude_m: 861,  terrain: CLIMB, description: TERRAS DE JALES, ipma_areas: [VRL], ipma_station_gid: 1171400, ipma_station_alt: 460 }
+  - { id: 3, name: CARAVELAS,       lat: 41.36374, lon: -7.76310, altitude_m: 1321, terrain: CLIMB, description: ALVÃO · COTA MÁXIMA, ipma_areas: [VRL], ipma_station_gid: 1171400, ipma_station_alt: 460 }
+  - { id: 4, name: MASCOSELO,       lat: 41.31602, lon: -7.87638, altitude_m: 876,  terrain: DESCEND, description: CAMPEÃ, ipma_areas: [VRL], ipma_station_gid: 1171400, ipma_station_alt: 460 }
