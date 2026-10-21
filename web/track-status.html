@@ -1,0 +1,1107 @@
+<!-- ∆ DSS · FC · MMXXVI -->
+<!DOCTYPE html>
+<html lang="pt" data-origin="41.2971,-7.7454">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQ ATMOS™ Track Status | Mountain Quest</title>
+    <meta name="description" content="Real-time meteorological monitoring system for Mountain Quest track. 6 sectors, updated every 10 minutes. Powered by MQ RIDER INDEX™ v3.2 + BELLATOR V21.2.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --mq-gold: #d4af37;
+            --mq-gold-dim: rgba(212, 175, 55, 0.15);
+            --mq-gold-hover: #f3ce56;
+            --mq-black: #030303;
+            --mq-surface: #0a0a0a;
+            --mq-surface-light: #121212;
+            --mq-border: rgba(255, 255, 255, 0.08);
+            --mq-text-dim: #888888;
+            --system-ok: #00ff9d;
+            --system-warn: #ffcc00;
+            --system-crit: #ff3333;
+            --system-storm: #ff8c00;
+            --system-heat: #f39c12;
+            --system-heat-danger: #7d0a0a;
+            --glass-bg: rgba(10, 10, 10, 0.7);
+        }
+
+        body {
+            background-color: var(--mq-black);
+            background-image:
+                radial-gradient(circle at 50% 0%, #1a1a1a 0%, var(--mq-black) 80%),
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            background-attachment: fixed;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 60px 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── HEADER ── */
+        .atmos-header-cluster {
+            max-width: 1100px;
+            margin: 0 auto 60px auto;
+            text-align: center;
+            position: relative;
+        }
+
+        .slogan {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            letter-spacing: 0.15rem;
+            color: var(--mq-text-dim);
+            margin-bottom: 24px;
+            text-transform: uppercase;
+        }
+
+        .slogan span { color: var(--mq-gold); font-weight: 800; }
+
+        .main-title {
+            font-family: 'Inter', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+            margin: 0;
+            background: linear-gradient(180deg, #FFFFFF 0%, #777777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            line-height: 1.1;
+        }
+
+        .sub-title-bar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            padding: 8px 24px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--mq-border);
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+            font-size: 0.75rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+
+        .tech-stack {
+            margin-top: 35px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #666;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .tech-stack span {
+            background: #000;
+            padding: 6px 12px;
+            border: 1px solid #222;
+            border-radius: 4px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .tech-stack b { color: var(--mq-gold); }
+
+        /* ── MATRIX CONTAINER ── */
+        .mq-status-matrix {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--glass-bg);
+            border: 1px solid var(--mq-border);
+            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02);
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+            position: relative;
+        }
+
+        .mq-status-matrix::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--mq-gold), transparent);
+            opacity: 0.5;
+            z-index: 10;
+        }
+
+        /* ── CONTROL BAR ── */
+        .matrix-control-bar {
+            padding: 24px 30px;
+            background: rgba(0,0,0,0.6);
+            border-bottom: 1px solid var(--mq-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .matrix-title {
+            font-weight: 900;
+            font-size: 1.2rem;
+            letter-spacing: 1.5px;
+            margin: 0;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .matrix-title::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 24px;
+            background: var(--mq-gold);
+            border-radius: 2px;
+        }
+
+        .matrix-title span { color: var(--mq-text-dim); font-weight: 600; }
+
+        .system-indicator {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--system-ok);
+            background: rgba(0,255,157,0.1);
+            padding: 8px 16px;
+            border: 1px solid rgba(0,255,157,0.3);
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(0,255,157,0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.4s ease;
+        }
+
+        .system-indicator::before {
+            content: '';
+            display: inline-block;
+            width: 6px; height: 6px;
+            background: var(--system-ok);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--system-ok);
+            animation: pulse-ok 2s infinite;
+            transition: all 0.4s ease;
+        }
+
+        .system-indicator.warn {
+            color: var(--system-warn);
+            background: rgba(255,204,0,0.1);
+            border-color: rgba(255,204,0,0.3);
+            box-shadow: 0 0 15px rgba(255,204,0,0.1);
+        }
+        .system-indicator.warn::before {
+            background: var(--system-warn);
+            box-shadow: 0 0 8px var(--system-warn);
+        }
+        .system-indicator.crit {
+            color: var(--system-crit);
+            background: rgba(255,51,51,0.1);
+            border-color: rgba(255,51,51,0.3);
+            box-shadow: 0 0 15px rgba(255,51,51,0.1);
+        }
+        .system-indicator.crit::before {
+            background: var(--system-crit);
+            box-shadow: 0 0 8px var(--system-crit);
+        }
+
+        @keyframes pulse-ok {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* ── SOURCES STRIP ── */
+        .sources-strip {
+            padding: 9px 30px;
+            background: #050505;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: #555;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0;
+        }
+
+        .sources-strip .src-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .sources-strip .src-item { display: flex; align-items: center; gap: 5px; }
+        .sources-strip .src-label { color: #444; }
+        .sources-strip .src-ok   { color: var(--system-ok); }
+        .sources-strip .src-warn { color: var(--system-warn); }
+        .sources-strip .src-err  { color: var(--system-crit); }
+        .sources-strip .src-gold { color: var(--mq-gold); }
+
+        .sources-strip .src-sep {
+            width: 1px; height: 14px;
+            background: #1a1a1a;
+            margin: 0 18px;
+            flex-shrink: 0;
+        }
+
+        .sources-strip .src-div {
+            color: var(--system-storm);
+        }
+
+        /* ── DIVERGENCE STRIP ── */
+        .divergence-strip {
+            padding: 10px 30px;
+            background: rgba(255,140,0,0.06);
+            border-bottom: 1px solid rgba(255,140,0,0.25);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--system-storm);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .divergence-strip strong { color: #ffaa44; }
+
+        /* ── ALERT BAR ── */
+        .matrix-alert-bar {
+            background-color: #1a1600;
+            border-bottom: 2px solid var(--mq-gold);
+            padding: 24px 30px;
+            display: flex;
+            align-items: flex-start;
+            gap: 24px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .alert-icon {
+            font-size: 2.5rem;
+            line-height: 1;
+            filter: drop-shadow(0 0 10px rgba(212,175,55,0.4));
+        }
+
+        .alert-content { line-height: 1.5; z-index: 2; position: relative; }
+
+        .alert-title {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            color: var(--mq-gold);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .alert-msg { font-size: 1.1rem; font-weight: 500; color: #fff; }
+        .alert-msg strong { color: var(--mq-gold); font-weight: 800; }
+
+        .alert-pt {
+            display: block;
+            font-size: 0.9rem;
+            color: #999;
+            margin-top: 8px;
+            border-left: 2px solid #444;
+            padding-left: 10px;
+        }
+
+        .alert-ipma-note {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            color: #e67e22;
+            margin-top: 10px;
+        }
+
+        /* ── SECTOR GRID ── */
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1px;
+            background: var(--mq-border);
+        }
+
+        .sector-panel {
+            background: var(--mq-surface-light);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .sector-panel:hover {
+            background: #181818;
+            z-index: 2;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .panel-head {
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.4);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .panel-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #ccc;
+            letter-spacing: 0.5px;
+        }
+
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            background: #333;
+            border-radius: 50%;
+            transition: all 0.4s ease;
+        }
+
+        .status-dot.ok   { background: var(--system-ok);   box-shadow: 0 0 12px var(--system-ok); }
+        .status-dot.warn { background: var(--system-warn);  box-shadow: 0 0 12px var(--system-warn); }
+        .status-dot.crit { background: var(--system-crit);  box-shadow: 0 0 12px var(--system-crit); }
+        .status-dot.storm { background: var(--system-storm); box-shadow: 0 0 12px var(--system-storm); }
+        .status-dot.heat { background: var(--system-heat); box-shadow: 0 0 12px var(--system-heat); }
+        .status-dot.nodata { background: #333; box-shadow: none; outline: 1px dashed var(--system-crit); }
+
+        .panel-nodata {
+            position: absolute; inset: 0; z-index: 3;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.78);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem; font-weight: 800; letter-spacing: 2px;
+            color: var(--system-crit); text-align: center; padding: 20px;
+        }
+        .sector-panel.nodata .panel-nodata { display: flex; }
+        .sector-panel.nodata .mq-real-img { filter: grayscale(1) brightness(0.4); }
+
+        .foot-gust { font-weight: 800; font-size: 0.72rem; color: var(--system-storm); }
+
+        .divergence-strip.invalid {
+            background: rgba(255,51,51,0.08);
+            border-bottom-color: rgba(255,51,51,0.4);
+            color: var(--system-crit);
+        }
+        .divergence-strip.invalid strong { color: #ff6b6b; }
+
+        .matrix-alert-bar.stale { filter: grayscale(0.8); }
+
+        .panel-body {
+            position: relative;
+            background: #000;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .panel-body::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.05) 50%),
+                linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.01), rgba(0,0,255,0.03));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+            z-index: 2;
+            mix-blend-mode: overlay;
+        }
+
+        .mq-real-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 1;
+            filter: contrast(1.1) brightness(1.1);
+            transition: all 0.5s ease;
+        }
+
+        .sector-panel:hover .mq-real-img {
+            transform: scale(1.03);
+            filter: contrast(1.15) brightness(1.2);
+        }
+
+        /* ── PANEL FOOT — live data row (legible, no PNG duplication) ── */
+        .panel-foot {
+            padding: 12px 24px;
+            background: #080808;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: #777;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border-top: 1px solid rgba(255,255,255,0.02);
+            flex-wrap: wrap;
+        }
+
+        .foot-live {
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-size: 0.72rem;
+            flex-shrink: 0;
+        }
+        .foot-live.live  { color: var(--system-ok);  animation: pulse-ok 2s infinite; }
+        .foot-live.stale { color: var(--system-crit); animation: none; }
+
+        .foot-con {
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            font-size: 0.72rem;
+        }
+
+        .foot-src { color: #555; font-size: 0.7rem; }
+
+        .foot-lp { font-weight: 700; font-size: 0.72rem; }
+
+        .foot-wbgt {
+            font-weight: 800;
+            font-size: 0.72rem;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        /* ── ATMOS FOOTER SIMULATE — generic, discreet ── */
+        .atmos-sim-wrap {
+            margin: 30px auto 0 auto;
+            max-width: 420px;
+        }
+
+        .btn-simulate {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 13px;
+            background: rgba(212,175,55,0.08);
+            color: var(--mq-text-dim);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border: 1px solid rgba(212,175,55,0.2);
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-simulate:hover {
+            background: var(--mq-gold-dim);
+            color: var(--mq-gold);
+            border-color: rgba(212,175,55,0.4);
+        }
+
+        /* ── FOOTER ── */
+        .matrix-footer {
+            padding: 40px;
+            background: rgba(0,0,0,0.8);
+            border-top: 1px solid var(--mq-border);
+            text-align: center;
+        }
+
+        .footer-brand {
+            font-weight: 900;
+            font-size: 0.85rem;
+            letter-spacing: 4px;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        .footer-tech {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+        .footer-tech span { color: var(--mq-gold); font-weight: bold; }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+        }
+
+        .footer-links a {
+            color: var(--mq-text-dim);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--mq-gold);
+            text-shadow: 0 0 10px rgba(212,175,55,0.3);
+        }
+
+        @media (max-width: 850px) {
+            .matrix-control-bar { flex-direction: column; align-items: flex-start; }
+            .footer-links { flex-direction: column; gap: 20px; align-items: center; }
+            body { padding: 30px 10px; }
+            .sources-strip { gap: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="atmos-header-cluster">
+        <div class="slogan">
+            The mountain doesn't warn. The data does.<br>
+            <span>A montanha não avisa. Os dados sim.</span>
+        </div>
+        <h1 class="main-title">MQ ATMOS™ Track Status</h1>
+        <div class="sub-title-bar">
+            <span>Real-time Monitoring System</span>
+            <span style="color:#555">|</span>
+            <span>Monitorização em Tempo Real</span>
+        </div>
+        <div class="tech-stack">
+            <span>SECTORS: <b>06</b></span>
+            <span>FREQ: <b>10MIN</b></span>
+            <span>ENGINE: <b>EEI V3.2 + WBGT + GUST</b></span>
+            <span>CONSENSUS: <b>IFS · ICON · IPMA</b></span>
+        </div>
+    </header>
+
+    <main class="mq-status-matrix">
+
+        <!-- CONTROL BAR -->
+        <div class="matrix-control-bar">
+            <h2 class="matrix-title">MQ TRACK <span>STATUS MATRIX</span></h2>
+            <div class="system-indicator" id="system-status">SYSTEM: INITIALIZING...</div>
+        </div>
+
+        <!-- SOURCES STRIP -->
+        <div class="sources-strip" id="sources-strip">
+            <span class="src-item"><span class="src-label">LOADING SOURCES...</span></span>
+        </div>
+
+        <!-- ALERT BAR -->
+        <div class="matrix-alert-bar" id="alert-bar">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-content" id="alert-content">
+                <span class="alert-title">SAFETY PROTOCOL // PROTOCOLO DE SEGURANÇA</span>
+                <div class="alert-msg">
+                    The best safety system in the mountain is <strong>COMMON SENSE</strong>.
+                </div>
+                <span class="alert-pt">O melhor sistema de segurança na montanha é o <strong>BOM SENSO</strong>.</span>
+            </div>
+        </div>
+
+        <!-- DIVERGENCE STRIP (hidden until data confirms divergence) -->
+        <div class="divergence-strip" id="divergence-strip" style="display:none">
+            <span id="divergence-text">⚠ <strong>MODEL DIVERGENCE</strong> — IFS vs ICON-EU (T &gt;3°C · P &gt;5mm · W &gt;20 · G &gt;30 km/h) —</span>
+            <span id="divergence-sectors">—</span>
+        </div>
+
+        <!-- SECTOR GRID -->
+        <div class="matrix-grid">
+
+            <section class="sector-panel">
+                <div class="panel-head">
+                    <span class="panel-id">SEC-01 // AMARANTE</span>
+                    <span class="status-dot" id="dot-1"></span>
+                </div>
+                <div class="panel-body">
+                    <img id="sector-img-1" src="/atmos/sector_1.png" class="mq-real-img" alt="SEC-01 Status">
+                    <div class="panel-nodata" id="nodata-1">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+                </div>
+                <div class="panel-foot" id="foot-1">
+                    <span class="foot-live" id="foot-live-1">—</span>
+                    <span class="foot-con" id="foot-con-1">—</span>
+                    <span class="foot-src" id="foot-src-1">—</span>
+                    <span class="foot-gust" id="foot-gust-1"></span>
+                    <span class="foot-wbgt" id="foot-wbgt-1"></span>
+                    <span class="foot-lp" id="foot-lp-1"></span>
+                </div>
+            </section>
+
+            <section class="sector-panel">
+                <div class="panel-head">
+                    <span class="panel-id">SEC-02 // S. DA ABOBOREIRA</span>
+                    <span class="status-dot" id="dot-2"></span>
+                </div>
+                <div class="panel-body">
+                    <img id="sector-img-2" src="/atmos/sector_2.png" class="mq-real-img" alt="SEC-02 Status">
+                    <div class="panel-nodata" id="nodata-2">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+                </div>
+                <div class="panel-foot" id="foot-2">
+                    <span class="foot-live" id="foot-live-2">—</span>
+                    <span class="foot-con" id="foot-con-2">—</span>
+                    <span class="foot-src" id="foot-src-2">—</span>
+                    <span class="foot-gust" id="foot-gust-2"></span>
+                    <span class="foot-wbgt" id="foot-wbgt-2"></span>
+                    <span class="foot-lp" id="foot-lp-2"></span>
+                </div>
+            </section>
+
+            <section class="sector-panel">
+                <div class="panel-head">
+                    <span class="panel-id">SEC-03 // SERRA DO MARÃO</span>
+                    <span class="status-dot" id="dot-3"></span>
+                </div>
+                <div class="panel-body">
+                    <img id="sector-img-3" src="/atmos/sector_3.png" class="mq-real-img" alt="SEC-03 Status">
+                    <div class="panel-nodata" id="nodata-3">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+                </div>
+                <div class="panel-foot" id="foot-3">
+                    <span class="foot-live" id="foot-live-3">—</span>
+                    <span class="foot-con" id="foot-con-3">—</span>
+                    <span class="foot-src" id="foot-src-3">—</span>
+                    <span class="foot-gust" id="foot-gust-3"></span>
+                    <span class="foot-wbgt" id="foot-wbgt-3"></span>
+                    <span class="foot-lp" id="foot-lp-3"></span>
+                </div>
+            </section>
+
+            <section class="sector-panel">
+                <div class="panel-head">
+                    <span class="panel-id">SEC-04 // GAVIÃO</span>
+                    <span class="status-dot" id="dot-4"></span>
+                </div>
+                <div class="panel-body">
+                    <img id="sector-img-4" src="/atmos/sector_4.png" class="mq-real-img" alt="SEC-04 Status">
+                    <div class="panel-nodata" id="nodata-4">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+                </div>
+                <div class="panel-foot" id="foot-4">
+                    <span class="foot-live" id="foot-live-4">—</span>
+                    <span class="foot-con" id="foot-con-4">—</span>
+                    <span class="foot-src" id="foot-src-4">—</span>
+                    <span class="foot-gust" id="foot-gust-4"></span>
+                    <span class="foot-wbgt" id="foot-wbgt-4"></span>
+                    <span class="foot-lp" id="foot-lp-4"></span>
+                </div>
+            </section>
+
+            <section class="sector-panel">
+                <div class="panel-head">
+                    <span class="panel-id">SEC-05 // SERRA DO ALVÃO</span>
+                    <span class="status-dot" id="dot-5"></span>
+                </div>
+                <div class="panel-body">
+                    <img id="sector-img-5" src="/atmos/sector_5.png" class="mq-real-img" alt="SEC-05 Status">
+                    <div class="panel-nodata" id="nodata-5">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+                </div>
+                <div class="panel-foot" id="foot-5">
+                    <span class="foot-live" id="foot-live-5">—</span>
+                    <span class="foot-con" id="foot-con-5">—</span>
+                    <span class="foot-src" id="foot-src-5">—</span>
+                    <span class="foot-gust" id="foot-gust-5"></span>
+                    <span class="foot-wbgt" id="foot-wbgt-5"></span>
+                    <span class="foot-lp" id="foot-lp-5"></span>
+                </div>
+            </section>
+
+            <section class="sector-panel">
+                <div class="panel-head">
+                    <span class="panel-id">SEC-06 // SRA. GRAÇA</span>
+                    <span class="status-dot" id="dot-6"></span>
+                </div>
+                <div class="panel-body">
+                    <img id="sector-img-6" src="/atmos/sector_6.png" class="mq-real-img" alt="SEC-06 Status">
+                    <div class="panel-nodata" id="nodata-6">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+                </div>
+                <div class="panel-foot" id="foot-6">
+                    <span class="foot-live" id="foot-live-6">—</span>
+                    <span class="foot-con" id="foot-con-6">—</span>
+                    <span class="foot-src" id="foot-src-6">—</span>
+                    <span class="foot-gust" id="foot-gust-6"></span>
+                    <span class="foot-wbgt" id="foot-wbgt-6"></span>
+                    <span class="foot-lp" id="foot-lp-6"></span>
+                </div>
+            </section>
+
+        </div>
+
+        <footer class="matrix-footer">
+            <div class="footer-brand">MQ ATMOS LAB™ // ULTRA MTB INTELLIGENCE</div>
+            <div class="footer-tech">
+                MULTI-SOURCE: <span>IFS · ICON-EU · IPMA · NASA POWER</span><br>
+                ENGINE: <span>MQ RIDER INDEX™ V3.2 + BELLATOR V21.2</span> | <span>PORTUGAL MICROCLIMATE</span><br>
+                CONSENSUS: <span>ECMWF IFS 0.25° · DWD ICON-EU · IPMA — 0.55/0.35/0.10</span> | <span>WBGT + GUST ACTIVE</span><br>
+                DEVELOPED BY <span>DREAMSPORTS SYSTEMS · DSS</span>
+            </div>
+            <div class="footer-links">
+                <a href="/ghost/">→ EXTENDED FORECAST</a>
+                <a href="/atmos/MQ_TACTICAL_MAP_CALIBRATED.html" target="_blank">→ TACTICAL MAP</a>
+            </div>
+            <div class="atmos-sim-wrap">
+                <a href="/performance-bios/" class="btn-simulate">⚡ SIMULATE RACE CONDITIONS</a>
+            </div>
+        </footer>
+
+    </main>
+
+    <script>
+    (function() {
+        console.log('%c∆ DSS · MQ ATMOS LAB™ · BELLATOR V21.2 · 41.2971,-7.7454', 'color:#F5D800;font-family:monospace;font-weight:bold;font-size:11px');
+
+        // ── CONFIG ──
+        const POLL_MS        = 5 * 60 * 1000;
+        const LIVE_MAX_MIN   = 15;    // LIVE label
+        const TRUST_MAX_MIN  = 30;    // beyond this the alert bar is neutralised
+        const GUST_SHOW_KMH  = 40;
+        const N_SECTORS      = 6;
+
+        // ── UTILITIES ──
+        const esc = v => String(v == null ? '' : v)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+        function localHHMM(isoUtc) {
+            const d = new Date(isoUtc);
+            if (isNaN(d)) return '—';
+            return d.toLocaleTimeString('pt-PT', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Lisbon' });
+        }
+
+        const STORM_RANK = { 'EXTREME':5, 'SEVERE':4, 'HIGH':3, 'MODERATE':2, 'LOW':1, 'NONE':0 };
+        const HEAT_RANK  = { 'HEAT DANGER':3, 'HEAT WARNING':2, 'HEAT CAUTION':1, 'NONE':0 };
+        const CON_COLORS = { 'AGREE':'#00ff9d', 'UNCERTAIN':'#ffcc00', 'DIVERGENT':'#ff8c00', 'INVALID':'#ff3333' };
+        const IRR_SHORT  = { 'NASA_POWER':'NASA', 'CODE_ESTIMATE':'EST', 'CLEAR_CONFIRMED':'CLR',
+                             'OPEN_METEO':'OM', 'IFS':'IFS', 'ICON':'ICON' };
+
+        // Backend rank (summary.alert_rank / current.status_rank) is the source of truth.
+        // Fallback for a V21.1 JSON without rank: derive from storm/heat/mri.
+        function alertRank(s) {
+            if (typeof s.alert_rank === 'number') return s.alert_rank;
+            const r = STORM_RANK[s.storm_level] || 0, h = HEAT_RANK[s.heat_level] || 0;
+            if (r >= 5 || s.min_mri <= 0) return 90;
+            if (r >= 4 || h >= 3)          return 80;
+            if (r >= 3)                    return 70;
+            if (r >= 2 || h >= 2 || s.min_mri <= 5)  return 60;
+            if (r >= 1 || h >= 1 || s.min_mri <= 10) return 40;
+            return 0;
+        }
+
+        function ageMinutes(data) {
+            const t = new Date(data.timestamp_utc).getTime();
+            return isNaN(t) ? Infinity : (Date.now() - t) / 60000;
+        }
+
+        // ── STATUS INDICATOR ──
+        function updateSystemStatus(data, age) {
+            const s  = data.summary, el = document.getElementById('system-status');
+            if (!el) return;
+            const ce       = data.consensus_engine || {};
+            const rank     = alertRank(s);
+            const divCount = (s.divergent_sectors || []).length;
+            const failed   = (s.sectors_failed || []).length;
+            const flags = [
+                s.ipma_active ? 'IPMA⚠' : '',
+                ce.models_identical_detected ? 'SINGLE MODEL' : '',
+                divCount ? `⚠ ${divCount} DIV` : '',
+                failed ? `✖ ${failed} NO DATA` : '',
+                (HEAT_RANK[s.heat_level]||0) ? `🔥${(s.heat_level||'').split(' ')[1]||''}` : '',
+                (s.max_gust||0) >= GUST_SHOW_KMH ? `G${Math.round(s.max_gust)}` : '',
+            ].filter(Boolean).join(' · ');
+
+            if (age > TRUST_MAX_MIN) {
+                el.textContent = `STALE ${Math.round(age)} MIN · ${localHHMM(data.timestamp_utc)}`;
+                el.className = 'system-indicator crit'; return;
+            }
+            el.textContent = `ONLINE · ${localHHMM(data.timestamp_utc)}${flags ? ' · ' + flags : ''}`;
+            el.className   = 'system-indicator';
+            if (rank >= 70 || failed || ce.models_identical_detected) el.classList.add('crit');
+            else if (rank >= 40)                                       el.classList.add('warn');
+        }
+
+        // ── SOURCES STRIP ──
+        function updateSourcesStrip(data) {
+            const s = data.summary, el = document.getElementById('sources-strip');
+            if (!el) return;
+            const ce       = data.consensus_engine || {};
+            const dropped  = ce.variables_dropped || {};
+            const identical= !!ce.models_identical_detected;
+            const nasa     = s.nasa_power_coverage || '—';
+            const ipmaFc   = s.ipma_forecast_coverage || '—';
+            const aemetOk  = !s.aemet_storm_alert;
+            const divSecs  = s.divergent_sectors || [];
+            const uncSecs  = (s.divergence_log || []).filter(d => d.status === 'UNCERTAIN').map(d => d.sector);
+            const failed   = (s.sectors_failed || []).map(f => f.name);
+
+            const cov = v => { const p = String(v).split('/'); return p[0] === p[1] ? 'src-ok' : 'src-warn'; };
+            const ifsDrop  = Object.values(dropped).some(d => (d.ifs||[]).length);
+            const iconDrop = Object.values(dropped).some(d => (d.icon||[]).length);
+            const modelCell = (name, drop) => identical
+                ? `<span class="src-item"><span class="src-label">${name}</span> <span class="src-err">IDENTICAL</span></span>`
+                : `<span class="src-item"><span class="src-label">${name}</span> <span class="${drop?'src-warn':'src-ok'}">${drop?'✓ −vars':'✓'}</span></span>`;
+
+            let tail = '<span class="src-item"><span style="color:#333">DIVERGENT: —</span></span>';
+            if (identical)            tail = `<span class="src-item src-err">✖ CONSENSUS INVALID — ONE MODEL</span>`;
+            else if (divSecs.length)  tail = `<span class="src-item src-div">⚠ DIV: ${esc(divSecs.join(' · '))}</span>`;
+            else if (uncSecs.length)  tail = `<span class="src-item" style="color:#ffcc00">? UNC: ${esc(uncSecs.join(' · '))}</span>`;
+            if (failed.length) tail += `<span class="src-sep"></span><span class="src-item src-err">✖ NO DATA: ${esc(failed.join(' · '))}</span>`;
+
+            el.innerHTML = `
+                <span class="src-group">
+                    ${modelCell('IFS', ifsDrop)}
+                    ${modelCell('ICON-EU', iconDrop)}
+                    <span class="src-item"><span class="src-label">IPMA</span> <span class="${cov(ipmaFc)}">${esc(ipmaFc)}</span></span>
+                    <span class="src-item"><span class="src-label">NASA</span> <span class="${cov(nasa)}">${esc(nasa)}</span></span>
+                    <span class="src-item"><span class="src-label">AEMET</span> <span class="${aemetOk?'src-ok':'src-err'}">${aemetOk?'OK':'ALERT'}</span></span>
+                </span>
+                <span class="src-sep"></span>
+                ${tail}`;
+        }
+
+        // ── ALERT BAR ──
+        function updateAlertBar(data, age) {
+            const s = data.summary, bar = document.getElementById('alert-bar'), content = document.getElementById('alert-content');
+            if (!bar || !content) return;
+            bar.classList.remove('stale');
+
+            const rank    = alertRank(s);
+            const sRank   = STORM_RANK[s.storm_level] || 0;
+            const hRank   = HEAT_RANK[s.heat_level] || 0;
+            const wbgtTxt = (typeof s.max_wbgt_c === 'number') ? ` | WBGT ${esc(s.max_wbgt_c)}°` : '';
+            const windTxt = `WIND ${esc(s.max_wind)} · GUST ${esc(s.max_gust ?? s.max_wind)} km/h`;
+            const ws      = esc(s.worst_sector), al = esc(s.alert_level), mri = esc(s.min_mri);
+            const ipmaNote  = s.ipma_active ? `<span class="alert-ipma-note">⚠ AVISO IPMA ATIVO</span>` : '';
+            const aemetNote = s.aemet_storm_alert ? `<span class="alert-ipma-note">AEMET: ${esc(s.aemet_alert_text)}</span>` : '';
+
+            // Data too old: never show GO on stale data
+            if (age > TRUST_MAX_MIN) {
+                bar.classList.add('stale');
+                bar.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                bar.style.borderColor     = '#444';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:#aaa;background:rgba(255,255,255,0.06)">⏸ DATA STALE // DADOS DESATUALIZADOS</span>
+                    <div class="alert-msg">Last reading ${Math.round(age)} min ago. Last known: <strong>${ws}</strong> ${al}</div>
+                    <span class="alert-pt">Sem leitura recente — decidir no terreno, não neste painel</span>`;
+                return;
+            }
+
+            if (rank >= 80) {
+                bar.style.backgroundColor = 'rgba(139,0,0,0.2)';
+                bar.style.borderColor     = 'var(--system-crit)';
+                const t = sRank >= 4 ? `🚨 ${esc(s.storm_level)} — CRITICAL ALERT // ALERTA CRÍTICA`
+                        : hRank >= 3 ? `🔥 HEAT DANGER // PERIGO DE CALOR`
+                        : `🚨 CRITICAL ALERT // ALERTA CRÍTICA`;
+                const pt = hRank >= 3 && sRank < 4 ? 'Plano especial de hidratação e ritmo — Risco de golpe de calor nas zonas expostas'
+                                                   : 'CONDIÇÕES EXTREMAS — TOME MÁXIMAS PRECAUÇÕES';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:var(--system-crit);background:rgba(255,0,0,0.15)">${t}</span>
+                    <div class="alert-msg"><strong>${ws}:</strong> ${al} | MRI ${mri}°${wbgtTxt} | ${windTxt}</div>
+                    <span class="alert-pt">${pt}</span>${ipmaNote}${aemetNote}`;
+            } else if (rank >= 70) {
+                bar.style.backgroundColor = 'rgba(255,51,51,0.1)';
+                bar.style.borderColor     = 'var(--system-crit)';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:var(--system-crit)">⚡ ${esc(s.storm_level)} — ${ws}</span>
+                    <div class="alert-msg"><strong>${al}</strong> | MRI ${mri}° | ${windTxt}</div>
+                    <span class="alert-pt">Afastar das zonas expostas — Monitorizar evolução</span>${ipmaNote}`;
+            } else if (rank >= 60) {
+                const heat = hRank >= 1 && sRank < 2;
+                bar.style.backgroundColor = heat ? 'rgba(243,156,18,0.08)' : 'rgba(255,204,0,0.08)';
+                bar.style.borderColor     = heat ? 'var(--system-heat)' : 'var(--system-warn)';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:${heat?'var(--system-heat)':'var(--system-warn)'}">${heat?'🔥 '+esc(s.heat_level)+' // ALERTA DE CALOR':'⚠️ WEATHER ALERT // ALERTA METEOROLÓGICA'}</span>
+                    <div class="alert-msg"><strong>${ws}:</strong> ${al} | MRI ${mri}°${wbgtTxt} | ${windTxt}</div>
+                    <span class="alert-pt">${heat?'Hidratação reforçada — Zonas expostas ao sol a partir das 10h':'Condições desafiantes — Equipamento térmico recomendado'}</span>${ipmaNote}`;
+            } else if (rank >= 40) {
+                const heat = hRank >= 1 && sRank < 1;
+                bar.style.backgroundColor = 'rgba(255,140,0,0.06)';
+                bar.style.borderColor     = heat ? 'var(--system-heat)' : 'var(--system-storm)';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:var(--system-storm)">${heat?'🔥 HEAT CAUTION // ATENÇÃO AO CALOR':'🌩 CAUTION // ATENÇÃO'}</span>
+                    <div class="alert-msg"><strong>${ws}:</strong> ${al}${wbgtTxt} | ${windTxt}</div>
+                    <span class="alert-pt">Monitorizar evolução</span>`;
+            } else if (!s.sectors_ok || s.sectors_ok < (s.sectors_expected || N_SECTORS)) {
+                bar.style.backgroundColor = 'rgba(255,204,0,0.08)';
+                bar.style.borderColor     = 'var(--system-warn)';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:var(--system-warn)">⚠ INCOMPLETE READING // LEITURA INCOMPLETA</span>
+                    <div class="alert-msg">${esc(s.sectors_ok||0)} of ${esc(s.sectors_expected||N_SECTORS)} sectors evaluated. No GO is issued on partial data.</div>
+                    <span class="alert-pt">Sem leitura completa — decidir no terreno, não neste painel</span>`;
+            } else {
+                bar.style.backgroundColor = 'rgba(0,255,157,0.04)';
+                bar.style.borderColor     = 'rgba(0,255,157,0.4)';
+                const n = (data.sectors || []).length;
+                content.innerHTML = `
+                    <span class="alert-title" style="color:var(--system-ok);background:rgba(0,255,157,0.08)">✅ ALL SECTORS: GO // TODOS OS SETORES: VERDE</span>
+                    <div class="alert-msg">Conditions favorable across all ${n} sectors. MIN MRI <strong>${mri}°</strong> | ${windTxt}</div>
+                    <span class="alert-pt">Condições favoráveis — Boa Aventura!</span>`;
+            }
+        }
+
+        // ── DIVERGENCE STRIP ──
+        function updateDivergenceStrip(data) {
+            const s = data.summary, ce = data.consensus_engine || {};
+            const el = document.getElementById('divergence-strip');
+            const txt = document.getElementById('divergence-text');
+            const span = document.getElementById('divergence-sectors');
+            if (!el) return;
+            el.classList.remove('invalid');
+            if (ce.models_identical_detected) {
+                el.classList.add('invalid');
+                if (txt)  txt.innerHTML = '✖ <strong>CONSENSUS INVALID</strong> — IFS and ICON returned identical data: one model, no cross-check —';
+                if (span) span.textContent = 'check models= parameter';
+                el.style.display = 'flex'; return;
+            }
+            const divSecs = s.divergent_sectors || [];
+            if (divSecs.length) {
+                if (txt)  txt.innerHTML = '⚠ <strong>MODEL DIVERGENCE</strong> — IFS vs ICON-EU (T &gt;3°C · P &gt;5mm · W &gt;20 · G &gt;30 km/h) —';
+                if (span) span.textContent = divSecs.join(' · ') + ' — values approximate';
+                el.style.display = 'flex';
+            } else el.style.display = 'none';
+        }
+
+        // ── SECTOR PANELS ──
+        function updateSectorPanels(data) {
+            const present = new Set((data.sectors || []).map(x => x.id));
+            for (let i = 1; i <= N_SECTORS; i++) {
+                const panel = document.getElementById(`dot-${i}`)?.closest('.sector-panel');
+                const dot   = document.getElementById(`dot-${i}`);
+                if (!present.has(i)) {
+                    if (panel) panel.classList.add('nodata');
+                    if (dot) dot.className = 'status-dot nodata';
+                    const con = document.getElementById(`foot-con-${i}`);
+                    if (con) { con.style.color = '#ff3333'; con.textContent = '[NO DATA]'; }
+                    ['src','gust','wbgt','lp'].forEach(k => { const e = document.getElementById(`foot-${k}-${i}`); if (e) e.textContent = ''; });
+                } else if (panel) panel.classList.remove('nodata');
+            }
+
+            (data.sectors || []).forEach(sec => {
+                const c = sec.current, con = sec.consensus || {}, id = sec.id;
+                const heat = c.heat || { wbgt_c: null, heat_level: 'NONE' };
+                const rank = (typeof c.status_rank === 'number') ? c.status_rank : null;
+                const sRank = STORM_RANK[c.storm_level] || 0, hRank = HEAT_RANK[heat.heat_level] || 0;
+
+                const dot = document.getElementById(`dot-${id}`);
+                if (dot) {
+                    dot.className = 'status-dot';
+                    if (rank !== null) {
+                        if (rank >= 70)      dot.classList.add('crit');
+                        else if (rank >= 60) dot.classList.add(sRank >= 2 ? 'storm' : hRank >= 1 ? 'heat' : 'warn');
+                        else if (rank >= 40) dot.classList.add(hRank >= 1 ? 'heat' : 'warn');
+                        else                 dot.classList.add('ok');
+                    } else {
+                        if (sRank >= 4 || c.eei < 0)  dot.classList.add('crit');
+                        else if (sRank >= 2)          dot.classList.add('storm');
+                        else if (hRank >= 2)          dot.classList.add('crit');
+                        else if (hRank >= 1)          dot.classList.add('heat');
+                        else if (c.eei < 5)           dot.classList.add('storm');
+                        else if (c.eei < 10)          dot.classList.add('warn');
+                        else                          dot.classList.add('ok');
+                    }
+                }
+
+                const st = con.status || 'AGREE';
+                const conEl = document.getElementById(`foot-con-${id}`);
+                if (conEl) {
+                    conEl.style.color = CON_COLORS[st] || '#666';
+                    conEl.textContent = st === 'AGREE' ? `[◈${con.sources_active || 2}SRC]`
+                                      : st === 'INVALID' ? '[✖ 1 MODEL]' : `[⚠${st.slice(0,3)}]`;
+                }
+
+                const srcEl = document.getElementById(`foot-src-${id}`);
+                if (srcEl) srcEl.textContent = IRR_SHORT[c.irradiance_source] || c.irradiance_source || '—';
+
+                const gustEl = document.getElementById(`foot-gust-${id}`);
+                if (gustEl) gustEl.textContent = (c.gust || 0) >= GUST_SHOW_KMH ? `G${Math.round(c.gust)}` : '';
+
+                const wbgtEl = document.getElementById(`foot-wbgt-${id}`);
+                if (wbgtEl) {
+                    if (hRank >= 1 && typeof heat.wbgt_c === 'number') {
+                        wbgtEl.style.color = hRank >= 3 ? '#7d0a0a' : hRank >= 2 ? '#e74c3c' : '#f39c12';
+                        wbgtEl.textContent = `🔥${heat.wbgt_c}°`;
+                    } else wbgtEl.textContent = '';
+                }
+
+                const lp = c.lightning_potential || 0;   // LPI, J/kg
+                const lpEl = document.getElementById(`foot-lp-${id}`);
+                if (lpEl) lpEl.innerHTML = lp >= 1
+                    ? `<span style="color:${lp>=10?'#8b0000':lp>=5?'#e74c3c':'#e67e22'}">⚡LPI ${lp.toFixed(0)}</span>` : '';
+            });
+        }
+
+        // ── FRESHNESS ──
+        function updateFreshnessIndicators(age) {
+            const isLive = age < LIVE_MAX_MIN;
+            const label  = isLive ? 'LIVE •' : `STALE ${Math.round(age)}m`;
+            for (let i = 1; i <= N_SECTORS; i++) {
+                const el = document.getElementById(`foot-live-${i}`);
+                if (!el) continue;
+                el.textContent = label;
+                el.className = `foot-live ${isLive ? 'live' : 'stale'}`;
+            }
+        }
+
+        // ── IMAGE REFRESH — keyed to the JSON timestamp, not wall clock ──
+        function refreshImages(data) {
+            const key = encodeURIComponent(data.timestamp_utc || Date.now());
+            for (let i = 1; i <= N_SECTORS; i++) {
+                const img = document.getElementById(`sector-img-${i}`);
+                if (img) img.src = `${img.src.split('?')[0]}?v=${key}`;
+            }
+        }
+
+        // ── MAIN FETCH ──
+        let lastTimestamp = null;
+        async function loadAtmosData() {
+            try {
+                const res = await fetch(`/atmos/status.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !data.summary) throw new Error('malformed JSON');
+                const age = ageMinutes(data);
+
+                updateSystemStatus(data, age);
+                updateSourcesStrip(data);
+                updateAlertBar(data, age);
+                updateDivergenceStrip(data);
+                updateSectorPanels(data);
+                updateFreshnessIndicators(age);
+                if (data.timestamp_utc !== lastTimestamp) { refreshImages(data); lastTimestamp = data.timestamp_utc; }
+            } catch (e) {
+                console.warn('ATMOS™ JSON unavailable:', e.message);
+                const el = document.getElementById('system-status');
+                if (el) { el.textContent = 'SYSTEM: NO FEED'; el.className = 'system-indicator crit'; }
+            }
+        }
+
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadAtmosData);
+        else loadAtmosData();
+        setInterval(loadAtmosData, POLL_MS);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAtmosData(); });
+    })();
+    </script>
+
+</body>
+</html>

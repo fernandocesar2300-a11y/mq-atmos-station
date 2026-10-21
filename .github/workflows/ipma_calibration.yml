@@ -14,7 +14,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           python3 -m pip install --upgrade pip
-          pip install requests
+          pip install requests pyyaml
       - name: Ejecutar IPMA Calibration
         run: |
           python3 ipma_calibration.py

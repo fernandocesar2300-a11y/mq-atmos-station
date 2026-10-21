@@ -1,0 +1,17 @@
+slug: mq
+name: Mountain Quest
+timezone: Europe/Lisbon
+event_date: 2027-06-12          # ajustar
+gpx_path: MQ_TRACK.gpx
+calibration_path: aemet_corrections.json
+publish_dir: test              # FTP root = mountainquest.pt/atmos/ · poner "" en el cutover
+aemet_area: "61"
+window: { start_local: 8, end_local: 20 }
+thresholds: { rain_mmh: 0.5, gust_kmh: 50, cold_c: 5, heat_c: 28 }
+points:
+  - { id: 1, name: AMARANTE,         lat: 41.2709, lon: -8.0797, altitude_m: 65,   terrain: FLAT,    description: START / BASE,   ipma_areas: [PTO, AVR, BRG], ipma_station_gid: 1130800 }
+  - { id: 2, name: S. DA ABOBOREIRA, lat: 41.1946, lon: -8.0563, altitude_m: 760,  terrain: CLIMB,   description: ENTRY POINT,    ipma_areas: [BRG, PTO] }
+  - { id: 3, name: SERRA DO MARÃO,   lat: 41.2484, lon: -7.8862, altitude_m: 1390, terrain: DESCEND, description: HIGH MOUNTAIN,  ipma_areas: [VRL, BRG, AVR], ipma_station_gid: 1171400, ipma_station_alt: 460 }
+  - { id: 4, name: GAVIÃO,           lat: 41.2777, lon: -7.9462, altitude_m: 986,  terrain: CLIMB,   description: THE FILTER,     ipma_areas: [VRL], ipma_station_gid: 1171400, ipma_station_alt: 460 }
+  - { id: 5, name: SERRA DO ALVÃO,   lat: 41.3738, lon: -7.8053, altitude_m: 1043, terrain: FLAT,    description: PLATEAU,        ipma_areas: [VRL], ipma_station_gid: 1171400, ipma_station_alt: 460 }
+  - { id: 6, name: SRA. GRAÇA,       lat: 41.4168, lon: -7.9106, altitude_m: 950,  terrain: CLIMB,   description: THE CLIMB,      ipma_areas: [VRL, BRG], ipma_station_gid: 1171400, ipma_station_alt: 460 }
