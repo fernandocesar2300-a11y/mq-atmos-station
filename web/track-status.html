@@ -108,7 +108,7 @@ a{color:inherit}
 
 .sf{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 22px;background:#080808;border-top:1px solid var(--line2);font-family:var(--mono);font-size:.68rem;color:#777}
 .sf .live{font-weight:800;letter-spacing:.08em;color:var(--ok);animation:pulse 2s infinite}
-.sf .live.stale{color:var(--crit);animation:none}
+.sf .live.stale{color:#888;animation:none}
 .sf .con{font-weight:700}
 .sf .st{color:#555;margin-left:auto;text-align:right}
 
@@ -186,7 +186,7 @@ a{color:inherit}
 console.log('%c∆ DSS FIELD · MQ ATMOS™ 22 · 41.2971,-7.7454','color:#F5D800;font-family:monospace;font-weight:bold;font-size:11px');
 
 const STATUS_URL='/atmos/status.json', FIELD_URL='/atmos/field.json';
-const POLL_MS=5*60*1000, LIVE_MIN=15, TRUST_MIN=30, GUST_HOT=40, N=6;
+const POLL_MS=5*60*1000, LIVE_MIN=60, OLD_MIN=6*60, TRUST_MIN=12*60, GUST_HOT=40, N=6;
 const SCHEMA=3;
 
 const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -211,10 +211,11 @@ const mriColor=(e,t)=>e<=0?'#ff3333':e<=5?'#ff8c00':e<=10?'#ffcc00':e<t?'#38bdf8
 function sys(d,a){
   const s=d.summary,el=document.getElementById('sys'),ce=d.consensus_engine||{};
   const failed=(s.sectors_failed||[]).length,div=(s.divergent_sectors||[]).length;
-  if(a>TRUST_MIN){el.textContent=`STALE ${Math.round(a)} MIN · ${hhmm(d.timestamp_utc)}`;el.className='sys crit';return}
+  if(a>TRUST_MIN){el.textContent=`NO UPDATE SINCE ${hhmm(d.timestamp_utc)} · ${Math.round(a/60)} H`;el.className='sys crit';return}
+  if(a>OLD_MIN){el.textContent=`UPDATED ${hhmm(d.timestamp_utc)} · ${Math.round(a/60)} H AGO`;el.className='sys warn';return}
   const f=[s.ipma_active?'IPMA⚠':'',ce.models_identical_detected?'SINGLE MODEL':'',div?`⚠ ${div} DIV`:'',failed?`✖ ${failed} NO DATA`:'',
     (HEAT[s.heat_level]||0)?`🔥${(s.heat_level||'').split(' ')[1]||''}`:'',(s.max_gust||0)>=GUST_HOT?`G${Math.round(s.max_gust)}`:'',d.degraded?'DEGRADED':''].filter(Boolean).join(' · ');
-  el.textContent=`ONLINE · ${hhmm(d.timestamp_utc)}${f?' · '+f:''}`;
+  el.textContent=`${a<LIVE_MIN?'LIVE':'UPDATED'} · ${hhmm(d.timestamp_utc)}${f?' · '+f:''}`;
   const r=rankOf(s);el.className='sys'+(r>=70||failed||ce.models_identical_detected||d.degraded?' crit':r>=40?' warn':'');
 }
 function src(d){
@@ -239,12 +240,14 @@ function alert(d,a){
   const ws=esc(s.worst_sector),al=esc(s.alert_level),mri=num(s.min_mri);
   const wind=`WIND ${num(s.max_wind)} · GUST ${num(s.max_gust??s.max_wind)} km/h`;
   const wb=(hr>=1&&typeof s.max_wbgt_c==='number')?` | WBGT ${s.max_wbgt_c}°`:'';
-  const notes=(s.ipma_active?`<span class="nt">⚠ AVISO IPMA ATIVO</span>`:'')+(s.aemet_storm_alert?`<span class="nt">AEMET: ${esc(s.aemet_alert_text)}</span>`:'');
+  const notes0=(s.ipma_active?`<span class="nt">⚠ AVISO IPMA ATIVO</span>`:'')+(s.aemet_storm_alert?`<span class="nt">AEMET: ${esc(s.aemet_alert_text)}</span>`:'');
   const set=(bg,bd,html)=>{bar.style.backgroundColor=bg;bar.style.borderColor=bd;c.innerHTML=html};
   if(a>TRUST_MIN||d.degraded){
     bar.classList.add('stale');
-    return set('rgba(255,255,255,.04)','#444',`<span class="t" style="color:#aaa;background:rgba(255,255,255,.06)">⏸ DATA STALE // DADOS DESATUALIZADOS</span><div class="m">Last reading ${Math.round(a)} min ago${d.degraded?' (engine degraded: '+esc(d.degraded_reason)+')':''}. Last known: <b>${ws}</b> ${al}</div><span class="pt">Sem leitura recente — decidir no terreno, não neste painel</span>`);
+    return set('rgba(255,255,255,.04)','#444',`<span class="t" style="color:#aaa;background:rgba(255,255,255,.06)">⏸ LAST UPDATE ${hhmm(d.timestamp_utc)} // ÚLTIMA ATUALIZAÇÃO</span><div class="m">Last reading ${Math.round(a/60)} h ago${d.degraded?' (engine degraded: '+esc(d.degraded_reason)+')':''}. Last known: <b>${ws}</b> ${al}</div><span class="pt">Leitura antiga — confirmar com o IPMA antes de decidir</span>`);
   }
+  const oldNote=a>OLD_MIN?`<span class="nt" style="color:#999">Last update ${hhmm(d.timestamp_utc)} · ${Math.round(a/60)} h ago</span>`:'';
+  const notes=notes0+oldNote;
   if(r>=80){
     const t=sr>=4?`🚨 ${esc(s.storm_level)} — CRITICAL ALERT // ALERTA CRÍTICA`:hr>=3?'🔥 HEAT DANGER // PERIGO DE CALOR':'🚨 CRITICAL ALERT // ALERTA CRÍTICA';
     const pt=hr>=3&&sr<4?'Plano especial de hidratação e ritmo — Risco de golpe de calor nas zonas expostas':'CONDIÇÕES EXTREMAS — TOME MÁXIMAS PRECAUÇÕES';
@@ -254,10 +257,10 @@ function alert(d,a){
   if(r>=60){const heat=hr>=1&&sr<2;
     return set(heat?'rgba(243,156,18,.08)':'rgba(255,204,0,.08)',heat?'var(--heat)':'var(--warn)',`<span class="t" style="color:${heat?'var(--heat)':'var(--warn)'}">${heat?'🔥 '+esc(s.heat_level)+' // ALERTA DE CALOR':'⚠️ WEATHER ALERT // ALERTA METEOROLÓGICA'}</span><div class="m"><b>${ws}:</b> ${al} | MRI ${mri}°${wb} | ${wind}</div><span class="pt">${heat?'Hidratação reforçada — Zonas expostas ao sol a partir das 10h':'Condições desafiantes — Equipamento térmico recomendado'}</span>${notes}`)}
   if(r>=40){const heat=hr>=1&&sr<1;
-    return set('rgba(255,140,0,.06)',heat?'var(--heat)':'var(--storm)',`<span class="t" style="color:var(--storm)">${heat?'🔥 HEAT CAUTION // ATENÇÃO AO CALOR':'🌩 CAUTION // ATENÇÃO'}</span><div class="m"><b>${ws}:</b> ${al}${wb} | ${wind}</div><span class="pt">Monitorizar evolução</span>`)}
+    return set('rgba(255,140,0,.06)',heat?'var(--heat)':'var(--storm)',`<span class="t" style="color:var(--storm)">${heat?'🔥 HEAT CAUTION // ATENÇÃO AO CALOR':'🌩 CAUTION // ATENÇÃO'}</span><div class="m"><b>${ws}:</b> ${al}${wb} | ${wind}</div><span class="pt">Monitorizar evolução</span>${notes}`)}
   if(!s.sectors_ok||s.sectors_ok<(s.sectors_expected||N))
     return set('rgba(255,204,0,.08)','var(--warn)',`<span class="t" style="color:var(--warn)">⚠ INCOMPLETE READING // LEITURA INCOMPLETA</span><div class="m">${esc(s.sectors_ok||0)} of ${esc(s.sectors_expected||N)} sectors evaluated. No GO is issued on partial data.</div><span class="pt">Sem leitura completa — decidir no terreno, não neste painel</span>`);
-  set('rgba(0,255,157,.04)','rgba(0,255,157,.4)',`<span class="t" style="color:var(--ok);background:rgba(0,255,157,.08)">✅ ALL SECTORS: GO // TODOS OS SETORES: VERDE</span><div class="m">Conditions favorable across all ${esc(s.sectors_ok)} sectors. MIN MRI <b>${mri}°</b> | ${wind}</div><span class="pt">Condições favoráveis — Boa Aventura!</span>`);
+  set('rgba(0,255,157,.04)','rgba(0,255,157,.4)',`<span class="t" style="color:var(--ok);background:rgba(0,255,157,.08)">✅ ALL SECTORS: GO // TODOS OS SETORES: VERDE</span><div class="m">Conditions favorable across all ${esc(s.sectors_ok)} sectors. MIN MRI <b>${mri}°</b> | ${wind}</div><span class="pt">Condições favoráveis — Boa Aventura!</span>${notes}`);
 }
 function divergence(d){
   const s=d.summary,ce=d.consensus_engine||{},el=document.getElementById('div'),t=document.getElementById('div-t'),sp=document.getElementById('div-s');
@@ -285,7 +288,7 @@ function weekHtml(fp,ev){
     </div>`}).join('');
   return `<div class="lbl"><span>7-DAY OUTLOOK</span><em>bar = P(rain) · ${fp.ensemble_members||0} mbr</em></div><div class="days">${days}</div>`;
 }
-function sectorHtml(sec,a){
+function sectorHtml(sec,a,d){
   const c=sec.current,con=sec.consensus||{},heat=c.heat||{};
   const r=typeof c.status_rank==='number'?c.status_rank:0,sr=STORM[c.storm_level]||0,hr=HEAT[heat.heat_level]||0;
   const dot=r>=70?'crit':r>=60?(sr>=2?'storm':hr>=1?'heat':'warn'):r>=40?(hr>=1?'heat':'warn'):'ok';
@@ -316,7 +319,7 @@ function sectorHtml(sec,a){
       <div class="tr"><span>+3H</span><div>${num(f3.temp)}° · G${num(f3.gust)} · MRI ${num(f3.eei)}° ${arrow(f3)}</div><span>+6H</span><div>${num(f6.temp)}° · G${num(f6.gust)} · MRI ${num(f6.eei)}° ${arrow(f6)}</div></div>
     </div>
     <div class="wk">${weekHtml(fieldByPoint[sec.id],esc(sec.name))}</div>
-    <div class="sf"><span class="live${a<LIVE_MIN?'':' stale'}">${a<LIVE_MIN?'LIVE •':'STALE '+Math.round(a)+'m'}</span><span class="con" style="color:${CON[st]||'#666'}">[${conTxt}]</span><span class="st">${esc(con.ipma_station||'')}</span></div>
+    <div class="sf"><span class="live${a<LIVE_MIN?'':' stale'}">${a<LIVE_MIN?'LIVE •':(a<TRUST_MIN?'UPD '+hhmm(d.timestamp_utc):'OLD '+Math.round(a/60)+'h')}</span><span class="con" style="color:${CON[st]||'#666'}">[${conTxt}]</span><span class="st">${esc(con.ipma_station||'')}</span></div>
   </section>`;
 }
 function nodataHtml(i,name){
@@ -327,7 +330,7 @@ function grid(d,a){
   (d.sectors||[]).forEach(s=>by[s.id]=s);
   const failed={};(d.summary.sectors_failed||[]).forEach(f=>failed[f.id]=f.name);
   const n=d.summary.sectors_expected||N;let html='';
-  for(let i=1;i<=n;i++)html+=by[i]?sectorHtml(by[i],a):nodataHtml(i,failed[i]||`SECTOR ${i}`);
+  for(let i=1;i<=n;i++)html+=by[i]?sectorHtml(by[i],a,d):nodataHtml(i,failed[i]||`SECTOR ${i}`);
   g.innerHTML=html;
 }
 

@@ -1,17 +1,25 @@
 name: DSS FIELD · ATMOS
 on:
+  # GitHub's schedule is best-effort (hours apart on this repo). So each run is a
+  # 5h45 loop: engine every 10 min. The next scheduled/pushed run queues behind
+  # it (concurrency) and takes over, giving continuous coverage without any
+  # external pinger. A push to main cancels the loop and restarts with new code.
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [atmos-run]
   schedule:
-    - cron: "7,17,27,37,47,57 * * * *"   # :x7 — GitHub delays :00 jobs
+    - cron: "7 */2 * * *"
   workflow_dispatch:
     inputs:
       event: { description: "events/<name>.yaml", default: "events/mq.yaml" }
 concurrency:
   group: atmos-${{ github.event.inputs.event || 'events/mq.yaml' }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,7 +39,12 @@ jobs:
           FTP_PASS: ${{ secrets.FTP_PASS }}
           AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-        run: python -m atmos.run --event "${{ github.event.inputs.event || 'events/mq.yaml' }}" --products status,field --publish --cards
+        run: |
+          end=$((SECONDS + 340*60))
+          while [ $SECONDS -lt $end ]; do
+            python -m atmos.run --event "${{ github.event.inputs.event || 'events/mq.yaml' }}" --products status,field --publish --cards || true
+            sleep 600
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: atmos-output, path: output, retention-days: 30 }

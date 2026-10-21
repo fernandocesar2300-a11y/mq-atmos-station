@@ -15,3 +15,13 @@ Layout: `atmos/sources` (Open-Meteo, IPMA, AEMET, NASA) · `atmos/physics` (EEI,
 · `atmos/render` (optional PNG) · `events/*.yaml` · `tests/`.
 
 Contract for consumers: ATMOS_CONTRACT.md.
+
+## Scheduling
+
+GitHub `schedule` is best-effort (hours apart on this repo), so the workflow does not rely on it:
+each run is a 5h40 loop that executes the engine every 10 minutes. The next run (cron every 2 h,
+a push to `main`, or a manual dispatch) cancels the loop and takes over, so coverage is continuous
+and a merge deploys new code within a minute. No external pinger needed; `repository_dispatch`
+(`atmos-run`) remains available if one is ever wanted.
+
+Watchdog: `HEALTHCHECK_URL` secret (healthchecks.io, period 10 min, grace 10 min) alerts when no run completes.
