@@ -6,7 +6,7 @@ import requests
 
 
 def ping(suffix: str = "", message: str = "") -> None:
-    url = os.environ.get("HEALTHCHECK_URL", "")
+    url = os.environ.get("HEALTHCHECK_URL") or ""
     if not url:
         return
     try:

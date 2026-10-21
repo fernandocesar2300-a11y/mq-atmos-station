@@ -10,7 +10,7 @@ KEYS = ("storm", "thunder", "tormen", "trovo", "granizo", "hail", "electric", "l
 
 
 def storm_alerts(area: Optional[str]) -> Tuple[bool, str, Optional[str]]:
-    key = os.environ.get("AEMET_API_KEY", "")
+    key = os.environ.get("AEMET_API_KEY") or ""
     if not key or not area:
         return False, "AEMET not configured", None
     try:

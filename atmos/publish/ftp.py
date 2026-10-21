@@ -28,7 +28,7 @@ def _connect(host: str, user: str, password: str, allow_plain: bool):
 
 def publish(files: List[Tuple[str, str]], remote_dir: str) -> str:
     """files: [(local_path, remote_name)] in upload order; the last one is renamed last."""
-    host = os.environ.get("FTP_HOST", "ftp.nexplore.pt")
+    host = os.environ.get("FTP_HOST") or "ftp.nexplore.pt"   # empty secret must not override the default
     user, pw = os.environ.get("FTP_USER"), os.environ.get("FTP_PASS")
     if not user or not pw:
         return "LOCAL MODE — FTP_USER/FTP_PASS not set"
