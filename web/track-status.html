@@ -2,1106 +2,356 @@
 <!DOCTYPE html>
 <html lang="pt" data-origin="41.2971,-7.7454">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MQ ATMOS™ Track Status | Mountain Quest</title>
-    <meta name="description" content="Real-time meteorological monitoring system for Mountain Quest track. 6 sectors, updated every 10 minutes. Powered by MQ RIDER INDEX™ v3.2 + BELLATOR V21.2.">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --mq-gold: #d4af37;
-            --mq-gold-dim: rgba(212, 175, 55, 0.15);
-            --mq-gold-hover: #f3ce56;
-            --mq-black: #030303;
-            --mq-surface: #0a0a0a;
-            --mq-surface-light: #121212;
-            --mq-border: rgba(255, 255, 255, 0.08);
-            --mq-text-dim: #888888;
-            --system-ok: #00ff9d;
-            --system-warn: #ffcc00;
-            --system-crit: #ff3333;
-            --system-storm: #ff8c00;
-            --system-heat: #f39c12;
-            --system-heat-danger: #7d0a0a;
-            --glass-bg: rgba(10, 10, 10, 0.7);
-        }
-
-        body {
-            background-color: var(--mq-black);
-            background-image:
-                radial-gradient(circle at 50% 0%, #1a1a1a 0%, var(--mq-black) 80%),
-                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-            background-size: 100% 100%, 30px 30px, 30px 30px;
-            background-attachment: fixed;
-            color: #ffffff;
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 60px 20px;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* ── HEADER ── */
-        .atmos-header-cluster {
-            max-width: 1100px;
-            margin: 0 auto 60px auto;
-            text-align: center;
-            position: relative;
-        }
-
-        .slogan {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            letter-spacing: 0.15rem;
-            color: var(--mq-text-dim);
-            margin-bottom: 24px;
-            text-transform: uppercase;
-        }
-
-        .slogan span { color: var(--mq-gold); font-weight: 800; }
-
-        .main-title {
-            font-family: 'Inter', sans-serif;
-            font-size: clamp(2.5rem, 6vw, 4.5rem);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: -2px;
-            margin: 0;
-            background: linear-gradient(180deg, #FFFFFF 0%, #777777 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            line-height: 1.1;
-        }
-
-        .sub-title-bar {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 15px;
-            padding: 8px 24px;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--mq-border);
-            border-radius: 50px;
-            backdrop-filter: blur(10px);
-            font-size: 0.75rem;
-            color: #aaa;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-weight: 600;
-        }
-
-        .tech-stack {
-            margin-top: 35px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: #666;
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .tech-stack span {
-            background: #000;
-            padding: 6px 12px;
-            border: 1px solid #222;
-            border-radius: 4px;
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
-        }
-
-        .tech-stack b { color: var(--mq-gold); }
-
-        /* ── MATRIX CONTAINER ── */
-        .mq-status-matrix {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: var(--glass-bg);
-            border: 1px solid var(--mq-border);
-            border-radius: 12px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02);
-            overflow: hidden;
-            backdrop-filter: blur(20px);
-            position: relative;
-        }
-
-        .mq-status-matrix::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, var(--mq-gold), transparent);
-            opacity: 0.5;
-            z-index: 10;
-        }
-
-        /* ── CONTROL BAR ── */
-        .matrix-control-bar {
-            padding: 24px 30px;
-            background: rgba(0,0,0,0.6);
-            border-bottom: 1px solid var(--mq-border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .matrix-title {
-            font-weight: 900;
-            font-size: 1.2rem;
-            letter-spacing: 1.5px;
-            margin: 0;
-            text-transform: uppercase;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .matrix-title::before {
-            content: '';
-            display: inline-block;
-            width: 8px;
-            height: 24px;
-            background: var(--mq-gold);
-            border-radius: 2px;
-        }
-
-        .matrix-title span { color: var(--mq-text-dim); font-weight: 600; }
-
-        .system-indicator {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--system-ok);
-            background: rgba(0,255,157,0.1);
-            padding: 8px 16px;
-            border: 1px solid rgba(0,255,157,0.3);
-            border-radius: 4px;
-            text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 1px;
-            box-shadow: 0 0 15px rgba(0,255,157,0.1);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.4s ease;
-        }
-
-        .system-indicator::before {
-            content: '';
-            display: inline-block;
-            width: 6px; height: 6px;
-            background: var(--system-ok);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--system-ok);
-            animation: pulse-ok 2s infinite;
-            transition: all 0.4s ease;
-        }
-
-        .system-indicator.warn {
-            color: var(--system-warn);
-            background: rgba(255,204,0,0.1);
-            border-color: rgba(255,204,0,0.3);
-            box-shadow: 0 0 15px rgba(255,204,0,0.1);
-        }
-        .system-indicator.warn::before {
-            background: var(--system-warn);
-            box-shadow: 0 0 8px var(--system-warn);
-        }
-        .system-indicator.crit {
-            color: var(--system-crit);
-            background: rgba(255,51,51,0.1);
-            border-color: rgba(255,51,51,0.3);
-            box-shadow: 0 0 15px rgba(255,51,51,0.1);
-        }
-        .system-indicator.crit::before {
-            background: var(--system-crit);
-            box-shadow: 0 0 8px var(--system-crit);
-        }
-
-        @keyframes pulse-ok {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
-
-        /* ── SOURCES STRIP ── */
-        .sources-strip {
-            padding: 9px 30px;
-            background: #050505;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            color: #555;
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0;
-        }
-
-        .sources-strip .src-group {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .sources-strip .src-item { display: flex; align-items: center; gap: 5px; }
-        .sources-strip .src-label { color: #444; }
-        .sources-strip .src-ok   { color: var(--system-ok); }
-        .sources-strip .src-warn { color: var(--system-warn); }
-        .sources-strip .src-err  { color: var(--system-crit); }
-        .sources-strip .src-gold { color: var(--mq-gold); }
-
-        .sources-strip .src-sep {
-            width: 1px; height: 14px;
-            background: #1a1a1a;
-            margin: 0 18px;
-            flex-shrink: 0;
-        }
-
-        .sources-strip .src-div {
-            color: var(--system-storm);
-        }
-
-        /* ── DIVERGENCE STRIP ── */
-        .divergence-strip {
-            padding: 10px 30px;
-            background: rgba(255,140,0,0.06);
-            border-bottom: 1px solid rgba(255,140,0,0.25);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.68rem;
-            color: var(--system-storm);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .divergence-strip strong { color: #ffaa44; }
-
-        /* ── ALERT BAR ── */
-        .matrix-alert-bar {
-            background-color: #1a1600;
-            border-bottom: 2px solid var(--mq-gold);
-            padding: 24px 30px;
-            display: flex;
-            align-items: flex-start;
-            gap: 24px;
-            transition: all 0.4s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .alert-icon {
-            font-size: 2.5rem;
-            line-height: 1;
-            filter: drop-shadow(0 0 10px rgba(212,175,55,0.4));
-        }
-
-        .alert-content { line-height: 1.5; z-index: 2; position: relative; }
-
-        .alert-title {
-            display: inline-block;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 800;
-            color: var(--mq-gold);
-            font-size: 0.8rem;
-            letter-spacing: 2px;
-            margin-bottom: 8px;
-            background: rgba(0,0,0,0.5);
-            padding: 4px 10px;
-            border-radius: 4px;
-        }
-
-        .alert-msg { font-size: 1.1rem; font-weight: 500; color: #fff; }
-        .alert-msg strong { color: var(--mq-gold); font-weight: 800; }
-
-        .alert-pt {
-            display: block;
-            font-size: 0.9rem;
-            color: #999;
-            margin-top: 8px;
-            border-left: 2px solid #444;
-            padding-left: 10px;
-        }
-
-        .alert-ipma-note {
-            display: block;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.68rem;
-            color: #e67e22;
-            margin-top: 10px;
-        }
-
-        /* ── SECTOR GRID ── */
-        .matrix-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 1px;
-            background: var(--mq-border);
-        }
-
-        .sector-panel {
-            background: var(--mq-surface-light);
-            display: flex;
-            flex-direction: column;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-        }
-
-        .sector-panel:hover {
-            background: #181818;
-            z-index: 2;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        }
-
-        .panel-head {
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0,0,0,0.4);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .panel-id {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: #ccc;
-            letter-spacing: 0.5px;
-        }
-
-        .status-dot {
-            height: 8px;
-            width: 8px;
-            background: #333;
-            border-radius: 50%;
-            transition: all 0.4s ease;
-        }
-
-        .status-dot.ok   { background: var(--system-ok);   box-shadow: 0 0 12px var(--system-ok); }
-        .status-dot.warn { background: var(--system-warn);  box-shadow: 0 0 12px var(--system-warn); }
-        .status-dot.crit { background: var(--system-crit);  box-shadow: 0 0 12px var(--system-crit); }
-        .status-dot.storm { background: var(--system-storm); box-shadow: 0 0 12px var(--system-storm); }
-        .status-dot.heat { background: var(--system-heat); box-shadow: 0 0 12px var(--system-heat); }
-        .status-dot.nodata { background: #333; box-shadow: none; outline: 1px dashed var(--system-crit); }
-
-        .panel-nodata {
-            position: absolute; inset: 0; z-index: 3;
-            display: none; align-items: center; justify-content: center;
-            background: rgba(0,0,0,0.78);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem; font-weight: 800; letter-spacing: 2px;
-            color: var(--system-crit); text-align: center; padding: 20px;
-        }
-        .sector-panel.nodata .panel-nodata { display: flex; }
-        .sector-panel.nodata .mq-real-img { filter: grayscale(1) brightness(0.4); }
-
-        .foot-gust { font-weight: 800; font-size: 0.72rem; color: var(--system-storm); }
-
-        .divergence-strip.invalid {
-            background: rgba(255,51,51,0.08);
-            border-bottom-color: rgba(255,51,51,0.4);
-            color: var(--system-crit);
-        }
-        .divergence-strip.invalid strong { color: #ff6b6b; }
-
-        .matrix-alert-bar.stale { filter: grayscale(0.8); }
-
-        .panel-body {
-            position: relative;
-            background: #000;
-            overflow: hidden;
-            aspect-ratio: 16/9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .panel-body::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background:
-                linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.05) 50%),
-                linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.01), rgba(0,0,255,0.03));
-            background-size: 100% 4px, 3px 100%;
-            pointer-events: none;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
-            z-index: 2;
-            mix-blend-mode: overlay;
-        }
-
-        .mq-real-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 1;
-            filter: contrast(1.1) brightness(1.1);
-            transition: all 0.5s ease;
-        }
-
-        .sector-panel:hover .mq-real-img {
-            transform: scale(1.03);
-            filter: contrast(1.15) brightness(1.2);
-        }
-
-        /* ── PANEL FOOT — live data row (legible, no PNG duplication) ── */
-        .panel-foot {
-            padding: 12px 24px;
-            background: #080808;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            color: #777;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            border-top: 1px solid rgba(255,255,255,0.02);
-            flex-wrap: wrap;
-        }
-
-        .foot-live {
-            font-weight: 800;
-            letter-spacing: 1px;
-            font-size: 0.72rem;
-            flex-shrink: 0;
-        }
-        .foot-live.live  { color: var(--system-ok);  animation: pulse-ok 2s infinite; }
-        .foot-live.stale { color: var(--system-crit); animation: none; }
-
-        .foot-con {
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            font-size: 0.72rem;
-        }
-
-        .foot-src { color: #555; font-size: 0.7rem; }
-
-        .foot-lp { font-weight: 700; font-size: 0.72rem; }
-
-        .foot-wbgt {
-            font-weight: 800;
-            font-size: 0.72rem;
-            letter-spacing: 0.5px;
-            flex-shrink: 0;
-        }
-
-        /* ── ATMOS FOOTER SIMULATE — generic, discreet ── */
-        .atmos-sim-wrap {
-            margin: 30px auto 0 auto;
-            max-width: 420px;
-        }
-
-        .btn-simulate {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            box-sizing: border-box;
-            padding: 13px;
-            background: rgba(212,175,55,0.08);
-            color: var(--mq-text-dim);
-            text-decoration: none;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            font-weight: 700;
-            border: 1px solid rgba(212,175,55,0.2);
-            border-radius: 4px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .btn-simulate:hover {
-            background: var(--mq-gold-dim);
-            color: var(--mq-gold);
-            border-color: rgba(212,175,55,0.4);
-        }
-
-        /* ── FOOTER ── */
-        .matrix-footer {
-            padding: 40px;
-            background: rgba(0,0,0,0.8);
-            border-top: 1px solid var(--mq-border);
-            text-align: center;
-        }
-
-        .footer-brand {
-            font-weight: 900;
-            font-size: 0.85rem;
-            letter-spacing: 4px;
-            color: #fff;
-            margin-bottom: 20px;
-        }
-
-        .footer-tech {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
-            color: #666;
-            margin-bottom: 30px;
-            line-height: 1.8;
-        }
-        .footer-tech span { color: var(--mq-gold); font-weight: bold; }
-
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
-        }
-
-        .footer-links a {
-            color: var(--mq-text-dim);
-            text-decoration: none;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-
-        .footer-links a:hover {
-            color: var(--mq-gold);
-            text-shadow: 0 0 10px rgba(212,175,55,0.3);
-        }
-
-        @media (max-width: 850px) {
-            .matrix-control-bar { flex-direction: column; align-items: flex-start; }
-            .footer-links { flex-direction: column; gap: 20px; align-items: center; }
-            body { padding: 30px 10px; }
-            .sources-strip { gap: 0; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSS FIELD · MQ ATMOS™ Track Status | Mountain Quest</title>
+<meta name="description" content="Live meteorological status of the Mountain Quest track. 6 sectors, nowcast every 10 minutes, 7-day ensemble outlook. DSS FIELD, powered by MQ ATMOS™ 22.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#d4af37;--gold-hi:#f3ce56;--gold-dim:rgba(212,175,55,.14);
+  --bg:#030303;--s0:#0a0a0a;--s1:#111111;--s2:#171717;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.04);
+  --txt:#f4f4f4;--dim:#8a8a8a;--mute:#555;
+  --ok:#00ff9d;--warn:#ffcc00;--crit:#ff3333;--storm:#ff8c00;--heat:#f39c12;--heat2:#7d0a0a;--cold:#38bdf8;
+  --mono:'JetBrains Mono',ui-monospace,monospace;--sans:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:56px 16px;background:var(--bg) radial-gradient(circle at 50% 0%,#191919 0%,var(--bg) 70%) fixed;color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+
+/* HEADER */
+.hd{max-width:1180px;margin:0 auto 44px;text-align:center}
+.hd .slogan{font-family:var(--mono);font-size:.78rem;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:20px}
+.hd .slogan b{color:var(--gold);font-weight:800}
+.hd h1{margin:0;font-size:clamp(2.2rem,6vw,4.2rem);font-weight:900;letter-spacing:-.03em;line-height:1.05;text-transform:uppercase;background:linear-gradient(180deg,#fff 0%,#777 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hd .sub{display:inline-flex;gap:14px;align-items:center;margin-top:14px;padding:8px 22px;border:1px solid var(--line);border-radius:999px;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:#aaa;font-weight:600;background:rgba(255,255,255,.03)}
+.hd .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:28px;font-family:var(--mono);font-size:.7rem;color:#666}
+.hd .chips span{padding:6px 12px;border:1px solid #222;border-radius:4px;background:#000}
+.hd .chips b{color:var(--gold)}
+
+/* MATRIX */
+.mx{max-width:1280px;margin:0 auto;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:rgba(10,10,10,.75);backdrop-filter:blur(18px);box-shadow:0 25px 50px -12px rgba(0,0,0,.6);position:relative}
+.mx::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.5;z-index:3}
+.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;padding:22px 28px;background:rgba(0,0,0,.6);border-bottom:1px solid var(--line)}
+.bar h2{margin:0;font-size:1.1rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.bar h2::before{content:'';width:8px;height:22px;background:var(--gold);border-radius:2px}
+.bar h2 span{color:var(--dim);font-weight:600}
+.sys{font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 14px;border-radius:4px;display:flex;align-items:center;gap:8px;color:var(--ok);background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.3);transition:.3s}
+.sys::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;animation:pulse 2s infinite}
+.sys.warn{color:var(--warn);background:rgba(255,204,0,.08);border-color:rgba(255,204,0,.3)}
+.sys.crit{color:var(--crit);background:rgba(255,51,51,.08);border-color:rgba(255,51,51,.3)}
+.sys.crit::before{animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.src{display:flex;flex-wrap:wrap;align-items:center;gap:0 18px;padding:9px 28px;background:#050505;border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:.64rem;color:var(--mute)}
+.src i{font-style:normal;color:#444;margin-right:5px}
+.src .ok{color:var(--ok)}.src .wn{color:var(--warn)}.src .er{color:var(--crit)}.src .dv{color:var(--storm)}
+.src .sep{width:1px;height:14px;background:#1a1a1a}
+
+.alert{display:flex;gap:22px;align-items:flex-start;padding:22px 28px;border-bottom:2px solid var(--gold);background:#1a1600;transition:.3s}
+.alert .ic{font-size:2.3rem;line-height:1;filter:drop-shadow(0 0 10px rgba(212,175,55,.4))}
+.alert .t{display:inline-block;font-family:var(--mono);font-weight:800;font-size:.74rem;letter-spacing:.16em;color:var(--gold);background:rgba(0,0,0,.5);padding:4px 10px;border-radius:4px;margin-bottom:8px}
+.alert .m{font-size:1.05rem;font-weight:500;line-height:1.5}
+.alert .m b{color:var(--gold);font-weight:800}
+.alert .pt{display:block;margin-top:8px;padding-left:10px;border-left:2px solid #444;font-size:.88rem;color:#999}
+.alert .nt{display:block;margin-top:10px;font-family:var(--mono);font-size:.66rem;color:#e67e22}
+.alert.stale{filter:grayscale(.85)}
+
+.div{display:none;align-items:center;gap:10px;padding:10px 28px;font-family:var(--mono);font-size:.66rem;color:var(--storm);background:rgba(255,140,0,.06);border-bottom:1px solid rgba(255,140,0,.25)}
+.div b{color:#ffaa44}
+.div.invalid{color:var(--crit);background:rgba(255,51,51,.08);border-bottom-color:rgba(255,51,51,.4)}
+.div.invalid b{color:#ff6b6b}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1px;background:var(--line)}
+.sec{background:var(--s1);display:flex;flex-direction:column;position:relative;transition:background .25s}
+.sec:hover{background:#161616}
+.sec.nodata .bd,.sec.nodata .wk{opacity:.25;filter:grayscale(1)}
+.sec .nd{display:none;position:absolute;inset:0;z-index:4;align-items:center;justify-content:center;text-align:center;padding:20px;background:rgba(0,0,0,.72);font-family:var(--mono);font-size:.78rem;font-weight:800;letter-spacing:.14em;color:var(--crit)}
+.sec.nodata .nd{display:flex}
+
+.sh{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.05)}
+.sh .id{font-family:var(--mono);font-size:.76rem;font-weight:700;color:#ccc;letter-spacing:.04em}
+.sh .id small{color:var(--mute);font-weight:400;margin-left:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:#333;transition:.3s}
+.dot.ok{background:var(--ok);box-shadow:0 0 12px var(--ok)}.dot.warn{background:var(--warn);box-shadow:0 0 12px var(--warn)}
+.dot.crit{background:var(--crit);box-shadow:0 0 12px var(--crit)}.dot.storm{background:var(--storm);box-shadow:0 0 12px var(--storm)}
+.dot.heat{background:var(--heat);box-shadow:0 0 12px var(--heat)}.dot.nodata{background:#333;outline:1px dashed var(--crit)}
+
+.bd{padding:18px 22px 14px;border-left:3px solid var(--mute);display:grid;grid-template-columns:1fr auto;gap:6px 16px;align-items:start}
+.bd .lbl{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;color:var(--mute);text-transform:uppercase}
+.bd .temp{font-size:3.4rem;font-weight:900;line-height:.95;letter-spacing:-.04em}
+.bd .temp sup{font-size:1.2rem;font-weight:700;color:var(--dim);vertical-align:top;margin-left:2px}
+.bd .mri{font-family:var(--mono);font-size:.8rem;font-weight:800;margin-top:6px}
+.bd .mri span{font-size:1.25rem}
+.bd .pill{justify-self:end;font-family:var(--mono);font-size:.7rem;font-weight:800;letter-spacing:.06em;padding:6px 10px;border-radius:4px;color:#fff;background:var(--mute);white-space:nowrap;max-width:190px;text-align:center}
+.bd .kv{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--line2)}
+.bd .kv div{font-family:var(--mono);font-size:.72rem;color:#bbb}
+.bd .kv div b{display:block;font-size:.58rem;letter-spacing:.12em;color:var(--mute);font-weight:400;margin-bottom:2px}
+.bd .kv .hot{color:var(--storm)}
+.bd .tr{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:.7rem;color:#999;margin-top:8px}
+.bd .tr span{color:var(--mute)}
+
+.wk{padding:10px 22px 12px;border-top:1px solid var(--line2);background:#0c0c0c}
+.wk .lbl{font-family:var(--mono);font-size:.58rem;letter-spacing:.14em;color:var(--mute);text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between}
+.wk .lbl em{font-style:normal;color:#444}
+.wk .days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wk .d{text-align:center;font-family:var(--mono);font-size:.6rem;color:#999;padding:6px 2px 5px;border-radius:4px;background:#111;border:1px solid transparent;line-height:1.5}
+.wk .d.ev{border-color:var(--gold);background:var(--gold-dim)}
+.wk .d .n{color:#666;font-size:.56rem;letter-spacing:.06em}
+.wk .d.ev .n{color:var(--gold);font-weight:800}
+.wk .d .t{color:#ddd;font-weight:700}
+.wk .d .p{height:4px;margin:4px 3px 3px;border-radius:2px;background:#1e1e1e;overflow:hidden}
+.wk .d .p i{display:block;height:100%;background:var(--cold)}
+.wk .d .g{color:#777}.wk .d .g.hot{color:var(--storm);font-weight:700}
+.wk .d .c{color:var(--cold)}.wk .d .h{color:var(--heat)}
+
+.sf{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 22px;background:#080808;border-top:1px solid var(--line2);font-family:var(--mono);font-size:.68rem;color:#777}
+.sf .live{font-weight:800;letter-spacing:.08em;color:var(--ok);animation:pulse 2s infinite}
+.sf .live.stale{color:var(--crit);animation:none}
+.sf .con{font-weight:700}
+.sf .st{color:#555;margin-left:auto;text-align:right}
+
+/* FOOTER */
+.ft{padding:36px 28px;background:rgba(0,0,0,.8);border-top:1px solid var(--line);text-align:center}
+.ft .b{font-weight:900;font-size:.82rem;letter-spacing:.3em;margin-bottom:16px}
+.ft .t{font-family:var(--mono);font-size:.68rem;color:#666;line-height:1.9;margin-bottom:24px}
+.ft .t span{color:var(--gold);font-weight:700}
+.ft .l{display:flex;justify-content:center;gap:36px;flex-wrap:wrap}
+.ft .l a{font-family:var(--mono);font-size:.76rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-decoration:none}
+.ft .l a:hover{color:var(--gold)}
+.ft .sim{display:block;max-width:420px;margin:28px auto 0;padding:13px;border:1px solid rgba(212,175,55,.2);border-radius:4px;background:rgba(212,175,55,.08);color:var(--dim);font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none}
+.ft .sim:hover{background:var(--gold-dim);color:var(--gold)}
+
+@media(max-width:700px){
+  body{padding:28px 10px}
+  .bar{flex-direction:column;align-items:flex-start}
+  .grid{grid-template-columns:1fr}
+  .bd .kv{grid-template-columns:repeat(2,1fr)}
+  .bd .temp{font-size:2.9rem}
+  .wk .d .g{display:none}
+}
+</style>
 </head>
 <body>
 
-    <header class="atmos-header-cluster">
-        <div class="slogan">
-            The mountain doesn't warn. The data does.<br>
-            <span>A montanha não avisa. Os dados sim.</span>
-        </div>
-        <h1 class="main-title">MQ ATMOS™ Track Status</h1>
-        <div class="sub-title-bar">
-            <span>Real-time Monitoring System</span>
-            <span style="color:#555">|</span>
-            <span>Monitorização em Tempo Real</span>
-        </div>
-        <div class="tech-stack">
-            <span>SECTORS: <b>06</b></span>
-            <span>FREQ: <b>10MIN</b></span>
-            <span>ENGINE: <b>EEI V3.2 + WBGT + GUST</b></span>
-            <span>CONSENSUS: <b>IFS · ICON · IPMA</b></span>
-        </div>
-    </header>
+<header class="hd">
+  <div class="slogan">The mountain doesn't warn. The data does.<br><b>A montanha não avisa. Os dados sim.</b></div>
+  <h1>MQ ATMOS™ Track Status</h1>
+  <div class="sub"><span>DSS FIELD</span><span style="color:#555">|</span><span>Live monitoring · Monitorização em direto</span></div>
+  <div class="chips">
+    <span>SECTORS <b>06</b></span>
+    <span>NOWCAST <b>10 MIN</b></span>
+    <span>MODELS <b>ECMWF IFS · ICON-EU · IPMA</b></span>
+    <span>OUTLOOK <b>7 D · 51-MEMBER ENSEMBLE</b></span>
+    <span>INDEX <b>MRI v3.2 + WBGT</b></span>
+  </div>
+</header>
 
-    <main class="mq-status-matrix">
+<main class="mx">
+  <div class="bar">
+    <h2>MQ TRACK <span>STATUS MATRIX</span></h2>
+    <div class="sys" id="sys">SYSTEM: INITIALIZING…</div>
+  </div>
+  <div class="src" id="src"><i>LOADING SOURCES…</i></div>
+  <div class="alert" id="alert">
+    <div class="ic">⚠️</div>
+    <div id="alert-c">
+      <span class="t">SAFETY PROTOCOL // PROTOCOLO DE SEGURANÇA</span>
+      <div class="m">The best safety system in the mountain is <b>COMMON SENSE</b>.</div>
+      <span class="pt">O melhor sistema de segurança na montanha é o <b>BOM SENSO</b>.</span>
+    </div>
+  </div>
+  <div class="div" id="div"><span id="div-t"></span><span id="div-s"></span></div>
+  <div class="grid" id="grid"></div>
+  <footer class="ft">
+    <div class="b">DSS FIELD // MQ ATMOS LAB™</div>
+    <div class="t">
+      ENGINE <span id="ft-ver">MQ ATMOS 22</span> · MRI v3.2 · WBGT · DUAL-MODEL STORM CONFIRMATION<br>
+      SOURCES <span>ECMWF IFS 0.25° · DWD ICON-EU · IPMA · NASA POWER</span> · CONSENSUS 0.55 / 0.35 / 0.10<br>
+      OUTLOOK <span>ECMWF ENSEMBLE 51 MEMBERS</span> · probabilities are member fractions, not opinions<br>
+      DEVELOPED BY <span>DREAMSPORTS SYSTEMS · DSS</span>
+    </div>
+    <div class="l">
+      <a href="/ghost/">→ Extended forecast</a>
+      <a href="/atmos/field.json" target="_blank" rel="noopener">→ field.json</a>
+      <a href="/atmos/status.json" target="_blank" rel="noopener">→ status.json</a>
+    </div>
+    <a href="/performance-bios/" class="sim">⚡ Simulate race conditions</a>
+  </footer>
+</main>
 
-        <!-- CONTROL BAR -->
-        <div class="matrix-control-bar">
-            <h2 class="matrix-title">MQ TRACK <span>STATUS MATRIX</span></h2>
-            <div class="system-indicator" id="system-status">SYSTEM: INITIALIZING...</div>
-        </div>
+<script>
+(function(){
+console.log('%c∆ DSS FIELD · MQ ATMOS™ 22 · 41.2971,-7.7454','color:#F5D800;font-family:monospace;font-weight:bold;font-size:11px');
 
-        <!-- SOURCES STRIP -->
-        <div class="sources-strip" id="sources-strip">
-            <span class="src-item"><span class="src-label">LOADING SOURCES...</span></span>
-        </div>
+const STATUS_URL='/atmos/status.json', FIELD_URL='/atmos/field.json';
+const POLL_MS=5*60*1000, LIVE_MIN=15, TRUST_MIN=30, GUST_HOT=40, N=6;
+const SCHEMA=3;
 
-        <!-- ALERT BAR -->
-        <div class="matrix-alert-bar" id="alert-bar">
-            <div class="alert-icon">⚠️</div>
-            <div class="alert-content" id="alert-content">
-                <span class="alert-title">SAFETY PROTOCOL // PROTOCOLO DE SEGURANÇA</span>
-                <div class="alert-msg">
-                    The best safety system in the mountain is <strong>COMMON SENSE</strong>.
-                </div>
-                <span class="alert-pt">O melhor sistema de segurança na montanha é o <strong>BOM SENSO</strong>.</span>
-            </div>
-        </div>
+const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const hhmm=iso=>{const d=new Date(iso);return isNaN(d)?'—':d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Lisbon'})};
+const age=d=>{const t=new Date(d.timestamp_utc).getTime();return isNaN(t)?Infinity:(Date.now()-t)/60000};
+const num=(v,nd=0)=>(typeof v==='number'&&isFinite(v))?v.toFixed(nd):'—';
+const STORM={EXTREME:5,SEVERE:4,HIGH:3,MODERATE:2,LOW:1,NONE:0};
+const HEAT={'HEAT DANGER':3,'HEAT WARNING':2,'HEAT CAUTION':1,NONE:0};
+const CON={AGREE:'#00ff9d',UNCERTAIN:'#ffcc00',DIVERGENT:'#ff8c00',INVALID:'#ff3333'};
+const WD=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+const WX={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',56:'Fz drizzle',57:'Fz drizzle',61:'Rain',63:'Rain',65:'Heavy rain',66:'Fz rain',67:'Fz rain',71:'Snow',73:'Snow',75:'Heavy snow',77:'Snow grains',80:'Showers',81:'Showers',82:'Violent showers',85:'Snow showers',86:'Snow showers',95:'Thunderstorm',96:'Hail',99:'Hail'};
 
-        <!-- DIVERGENCE STRIP (hidden until data confirms divergence) -->
-        <div class="divergence-strip" id="divergence-strip" style="display:none">
-            <span id="divergence-text">⚠ <strong>MODEL DIVERGENCE</strong> — IFS vs ICON-EU (T &gt;3°C · P &gt;5mm · W &gt;20 · G &gt;30 km/h) —</span>
-            <span id="divergence-sectors">—</span>
-        </div>
+function rankOf(s){
+  if(typeof s.alert_rank==='number')return s.alert_rank;
+  const r=STORM[s.storm_level]||0,h=HEAT[s.heat_level]||0;
+  if(r>=5||s.min_mri<=0)return 90;if(r>=4||h>=3)return 80;if(r>=3)return 70;
+  if(r>=2||h>=2||s.min_mri<=5)return 60;if(r>=1||h>=1||s.min_mri<=10)return 40;return 0;
+}
+const mriColor=(e,t)=>e<=0?'#ff3333':e<=5?'#ff8c00':e<=10?'#ffcc00':e<t?'#38bdf8':'#fca5a5';
 
-        <!-- SECTOR GRID -->
-        <div class="matrix-grid">
+/* ---------- top ---------- */
+function sys(d,a){
+  const s=d.summary,el=document.getElementById('sys'),ce=d.consensus_engine||{};
+  const failed=(s.sectors_failed||[]).length,div=(s.divergent_sectors||[]).length;
+  if(a>TRUST_MIN){el.textContent=`STALE ${Math.round(a)} MIN · ${hhmm(d.timestamp_utc)}`;el.className='sys crit';return}
+  const f=[s.ipma_active?'IPMA⚠':'',ce.models_identical_detected?'SINGLE MODEL':'',div?`⚠ ${div} DIV`:'',failed?`✖ ${failed} NO DATA`:'',
+    (HEAT[s.heat_level]||0)?`🔥${(s.heat_level||'').split(' ')[1]||''}`:'',(s.max_gust||0)>=GUST_HOT?`G${Math.round(s.max_gust)}`:'',d.degraded?'DEGRADED':''].filter(Boolean).join(' · ');
+  el.textContent=`ONLINE · ${hhmm(d.timestamp_utc)}${f?' · '+f:''}`;
+  const r=rankOf(s);el.className='sys'+(r>=70||failed||ce.models_identical_detected||d.degraded?' crit':r>=40?' warn':'');
+}
+function src(d){
+  const s=d.summary,ce=d.consensus_engine||{},el=document.getElementById('src');
+  const cov=v=>{const p=String(v||'0/0').split('/');return p[0]===p[1]?'ok':'wn'};
+  const miss=(d.sectors||[]).some(x=>Object.values((x.sources||{}).missing||{}).some(a=>a.length));
+  const ident=!!ce.models_identical_detected;
+  const model=(n)=>ident?`<span><i>${n}</i><span class="er">IDENTICAL</span></span>`:`<span><i>${n}</i><span class="${miss?'wn':'ok'}">✓${miss?' −vars':''}</span></span>`;
+  const uncs=(s.divergence_log||[]).filter(x=>x.status==='UNCERTAIN').map(x=>x.sector);
+  let tail=`<span style="color:#333">DIVERGENT: —</span>`;
+  if(ident)tail=`<span class="er">✖ CONSENSUS INVALID — ONE MODEL</span>`;
+  else if((s.divergent_sectors||[]).length)tail=`<span class="dv">⚠ DIV: ${esc(s.divergent_sectors.join(' · '))}</span>`;
+  else if(uncs.length)tail=`<span class="wn">? UNC: ${esc(uncs.join(' · '))}</span>`;
+  const failed=(s.sectors_failed||[]).map(f=>f.name);
+  if(failed.length)tail+=`<span class="sep"></span><span class="er">✖ NO DATA: ${esc(failed.join(' · '))}</span>`;
+  el.innerHTML=`${model('IFS')}${model('ICON-EU')}<span><i>IPMA</i><span class="${cov(s.ipma_forecast_coverage)}">${esc(s.ipma_forecast_coverage||'—')}</span></span><span><i>NASA</i><span class="${cov(s.nasa_power_coverage)}">${esc(s.nasa_power_coverage||'—')}</span></span><span><i>AEMET</i><span class="${s.aemet_storm_alert?'er':'ok'}">${s.aemet_storm_alert?'ALERT':'OK'}</span></span><span class="sep"></span>${tail}`;
+}
+function alert(d,a){
+  const s=d.summary,bar=document.getElementById('alert'),c=document.getElementById('alert-c');
+  bar.classList.remove('stale');
+  const r=rankOf(s),sr=STORM[s.storm_level]||0,hr=HEAT[s.heat_level]||0;
+  const ws=esc(s.worst_sector),al=esc(s.alert_level),mri=num(s.min_mri);
+  const wind=`WIND ${num(s.max_wind)} · GUST ${num(s.max_gust??s.max_wind)} km/h`;
+  const wb=(hr>=1&&typeof s.max_wbgt_c==='number')?` | WBGT ${s.max_wbgt_c}°`:'';
+  const notes=(s.ipma_active?`<span class="nt">⚠ AVISO IPMA ATIVO</span>`:'')+(s.aemet_storm_alert?`<span class="nt">AEMET: ${esc(s.aemet_alert_text)}</span>`:'');
+  const set=(bg,bd,html)=>{bar.style.backgroundColor=bg;bar.style.borderColor=bd;c.innerHTML=html};
+  if(a>TRUST_MIN||d.degraded){
+    bar.classList.add('stale');
+    return set('rgba(255,255,255,.04)','#444',`<span class="t" style="color:#aaa;background:rgba(255,255,255,.06)">⏸ DATA STALE // DADOS DESATUALIZADOS</span><div class="m">Last reading ${Math.round(a)} min ago${d.degraded?' (engine degraded: '+esc(d.degraded_reason)+')':''}. Last known: <b>${ws}</b> ${al}</div><span class="pt">Sem leitura recente — decidir no terreno, não neste painel</span>`);
+  }
+  if(r>=80){
+    const t=sr>=4?`🚨 ${esc(s.storm_level)} — CRITICAL ALERT // ALERTA CRÍTICA`:hr>=3?'🔥 HEAT DANGER // PERIGO DE CALOR':'🚨 CRITICAL ALERT // ALERTA CRÍTICA';
+    const pt=hr>=3&&sr<4?'Plano especial de hidratação e ritmo — Risco de golpe de calor nas zonas expostas':'CONDIÇÕES EXTREMAS — TOME MÁXIMAS PRECAUÇÕES';
+    return set('rgba(139,0,0,.2)','var(--crit)',`<span class="t" style="color:var(--crit);background:rgba(255,0,0,.15)">${t}</span><div class="m"><b>${ws}:</b> ${al} | MRI ${mri}°${wb} | ${wind}</div><span class="pt">${pt}</span>${notes}`);
+  }
+  if(r>=70)return set('rgba(255,51,51,.1)','var(--crit)',`<span class="t" style="color:var(--crit)">⚡ ${esc(s.storm_level)} — ${ws}</span><div class="m"><b>${al}</b> | MRI ${mri}° | ${wind}</div><span class="pt">Afastar das zonas expostas — Monitorizar evolução</span>${notes}`);
+  if(r>=60){const heat=hr>=1&&sr<2;
+    return set(heat?'rgba(243,156,18,.08)':'rgba(255,204,0,.08)',heat?'var(--heat)':'var(--warn)',`<span class="t" style="color:${heat?'var(--heat)':'var(--warn)'}">${heat?'🔥 '+esc(s.heat_level)+' // ALERTA DE CALOR':'⚠️ WEATHER ALERT // ALERTA METEOROLÓGICA'}</span><div class="m"><b>${ws}:</b> ${al} | MRI ${mri}°${wb} | ${wind}</div><span class="pt">${heat?'Hidratação reforçada — Zonas expostas ao sol a partir das 10h':'Condições desafiantes — Equipamento térmico recomendado'}</span>${notes}`)}
+  if(r>=40){const heat=hr>=1&&sr<1;
+    return set('rgba(255,140,0,.06)',heat?'var(--heat)':'var(--storm)',`<span class="t" style="color:var(--storm)">${heat?'🔥 HEAT CAUTION // ATENÇÃO AO CALOR':'🌩 CAUTION // ATENÇÃO'}</span><div class="m"><b>${ws}:</b> ${al}${wb} | ${wind}</div><span class="pt">Monitorizar evolução</span>`)}
+  if(!s.sectors_ok||s.sectors_ok<(s.sectors_expected||N))
+    return set('rgba(255,204,0,.08)','var(--warn)',`<span class="t" style="color:var(--warn)">⚠ INCOMPLETE READING // LEITURA INCOMPLETA</span><div class="m">${esc(s.sectors_ok||0)} of ${esc(s.sectors_expected||N)} sectors evaluated. No GO is issued on partial data.</div><span class="pt">Sem leitura completa — decidir no terreno, não neste painel</span>`);
+  set('rgba(0,255,157,.04)','rgba(0,255,157,.4)',`<span class="t" style="color:var(--ok);background:rgba(0,255,157,.08)">✅ ALL SECTORS: GO // TODOS OS SETORES: VERDE</span><div class="m">Conditions favorable across all ${esc(s.sectors_ok)} sectors. MIN MRI <b>${mri}°</b> | ${wind}</div><span class="pt">Condições favoráveis — Boa Aventura!</span>`);
+}
+function divergence(d){
+  const s=d.summary,ce=d.consensus_engine||{},el=document.getElementById('div'),t=document.getElementById('div-t'),sp=document.getElementById('div-s');
+  el.classList.remove('invalid');
+  if(ce.models_identical_detected){el.classList.add('invalid');t.innerHTML='✖ <b>CONSENSUS INVALID</b> — IFS and ICON returned identical data: one model, no cross-check —';sp.textContent='check models= parameter';el.style.display='flex';return}
+  const ds=s.divergent_sectors||[];
+  if(ds.length){t.innerHTML='⚠ <b>MODEL DIVERGENCE</b> — IFS vs ICON-EU (T &gt;3°C · P &gt;5mm · W &gt;20 · G &gt;30 km/h) —';sp.textContent=ds.join(' · ')+' — values approximate';el.style.display='flex'}
+  else el.style.display='none';
+}
 
-            <section class="sector-panel">
-                <div class="panel-head">
-                    <span class="panel-id">SEC-01 // AMARANTE</span>
-                    <span class="status-dot" id="dot-1"></span>
-                </div>
-                <div class="panel-body">
-                    <img id="sector-img-1" src="/atmos/sector_1.png" class="mq-real-img" alt="SEC-01 Status">
-                    <div class="panel-nodata" id="nodata-1">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
-                </div>
-                <div class="panel-foot" id="foot-1">
-                    <span class="foot-live" id="foot-live-1">—</span>
-                    <span class="foot-con" id="foot-con-1">—</span>
-                    <span class="foot-src" id="foot-src-1">—</span>
-                    <span class="foot-gust" id="foot-gust-1"></span>
-                    <span class="foot-wbgt" id="foot-wbgt-1"></span>
-                    <span class="foot-lp" id="foot-lp-1"></span>
-                </div>
-            </section>
+/* ---------- sectors ---------- */
+let fieldByPoint={};
+function weekHtml(fp,ev){
+  if(!fp||!fp.days||!fp.days.length)return `<div class="lbl"><span>7-DAY OUTLOOK</span><em>no field data</em></div>`;
+  const days=fp.days.slice(0,7).map(dy=>{
+    const s=dy.summary,dt=new Date(dy.date+'T12:00:00');
+    const pr=s.p_rain_max,pc=s.p_cold_max,ph=s.p_heat_max,pg=s.p_gust_50_max;
+    const tag=(pc!=null&&pc>=.5)?`<span class="c">❄${Math.round(pc*100)}%</span>`:(ph!=null&&ph>=.5)?`<span class="h">🔥${Math.round(ph*100)}%</span>`:'';
+    return `<div class="d${dy.is_event_day?' ev':''}" title="${esc(dy.date)} · rain ${num(s.rain_total,1)} mm · gust max ${num(s.gust_max)} km/h · MRI min ${num(s.eei_min)}°${pr!=null?' · P(rain) '+Math.round(pr*100)+'%':''}${pg!=null?' · P(gust≥50) '+Math.round(pg*100)+'%':''}">
+      <div class="n">${dy.is_event_day?'RACE':WD[dt.getDay()]}</div>
+      <div class="t">${num(s.temp_min)}–${num(s.temp_max)}°</div>
+      <div class="p"><i style="width:${pr!=null?Math.round(pr*100):0}%"></i></div>
+      <div class="g${(s.gust_max||0)>=GUST_HOT?' hot':''}">G${num(s.gust_max)}</div>
+      ${tag}
+    </div>`}).join('');
+  return `<div class="lbl"><span>7-DAY OUTLOOK</span><em>bar = P(rain) · ${fp.ensemble_members||0} mbr</em></div><div class="days">${days}</div>`;
+}
+function sectorHtml(sec,a){
+  const c=sec.current,con=sec.consensus||{},heat=c.heat||{};
+  const r=typeof c.status_rank==='number'?c.status_rank:0,sr=STORM[c.storm_level]||0,hr=HEAT[heat.heat_level]||0;
+  const dot=r>=70?'crit':r>=60?(sr>=2?'storm':hr>=1?'heat':'warn'):r>=40?(hr>=1?'heat':'warn'):'ok';
+  const st=con.status||'AGREE';
+  const conTxt=st==='AGREE'?`◈ ${con.sources_active||2} SRC AGREE`:st==='INVALID'?'✖ 1 MODEL':`${st==='DIVERGENT'?'⚠':'?'} IFS ${num(con.ifs_temp,1)}° · ICON ${num(con.icon_temp,1)}°`;
+  const f3=sec.forecast_3h||{},f6=sec.forecast_6h||{};
+  const arrow=f=>typeof f.eei!=='number'?'':f.eei-c.eei<-2?'↓':f.eei-c.eei>2?'↑':'→';
+  const lpi=c.lightning_potential||0;
+  const kv=[
+    ['WIND',`${num(c.wind)} <small>km/h</small>`,''],
+    ['GUST',`${num(c.gust)} <small>km/h</small>`,(c.gust||0)>=GUST_HOT?'hot':''],
+    ['RAIN',`${num(c.rain,1)} <small>mm/h</small>`,(c.rain||0)>5?'hot':''],
+    ['HUM',`${num(c.humidity)}<small>%</small>`,''],
+  ];
+  const extra=[];
+  if(hr>=1&&typeof heat.wbgt_c==='number')extra.push(`<div class="hot"><b>WBGT</b>🔥 ${heat.wbgt_c}°</div>`);
+  if(lpi>=1)extra.push(`<div class="hot"><b>LPI</b>⚡ ${lpi.toFixed(0)}</div>`);
+  if(c.snow_detected)extra.push(`<div style="color:var(--cold)"><b>SNOW</b>❄ ${esc(c.snow_intensity||'')}</div>`);
+  if(c.microclimate_notes)extra.push(`<div><b>NOTE</b>${esc(c.microclimate_notes)}</div>`);
+  return `<section class="sec" id="sec-${sec.id}">
+    <div class="sh"><span class="id">SEC-${String(sec.id).padStart(2,'0')} // ${esc(sec.name)}<small>${esc(sec.coords.elevation)} m · ${esc(sec.description||sec.terrain_type)}</small></span><span class="dot ${dot}"></span></div>
+    <div class="nd">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
+    <div class="bd" style="border-left-color:${esc(c.color||'#555')}">
+      <div><div class="lbl">${esc(WX[c.code]||'—')}</div><div class="temp">${num(c.temp)}<sup>°C</sup></div>
+        <div class="mri" style="color:${mriColor(c.eei,c.temp)}">MRI <span>${num(c.eei)}°</span> <span style="font-size:.65rem;color:var(--mute)">rider index</span></div></div>
+      <div class="pill" style="background:${esc(c.color||'#555')}">${esc(c.status)}</div>
+      <div class="kv">${kv.map(([k,v,cls])=>`<div class="${cls}"><b>${k}</b>${v}</div>`).join('')}${extra.join('')}</div>
+      <div class="tr"><span>+3H</span><div>${num(f3.temp)}° · G${num(f3.gust)} · MRI ${num(f3.eei)}° ${arrow(f3)}</div><span>+6H</span><div>${num(f6.temp)}° · G${num(f6.gust)} · MRI ${num(f6.eei)}° ${arrow(f6)}</div></div>
+    </div>
+    <div class="wk">${weekHtml(fieldByPoint[sec.id],esc(sec.name))}</div>
+    <div class="sf"><span class="live${a<LIVE_MIN?'':' stale'}">${a<LIVE_MIN?'LIVE •':'STALE '+Math.round(a)+'m'}</span><span class="con" style="color:${CON[st]||'#666'}">[${conTxt}]</span><span class="st">${esc(con.ipma_station||'')}</span></div>
+  </section>`;
+}
+function nodataHtml(i,name){
+  return `<section class="sec nodata" id="sec-${i}"><div class="sh"><span class="id">SEC-${String(i).padStart(2,'0')} // ${esc(name)}</span><span class="dot nodata"></span></div><div class="nd">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div><div class="bd"><div class="temp">—</div></div><div class="sf"><span class="con" style="color:var(--crit)">[NO DATA]</span></div></section>`;
+}
+function grid(d,a){
+  const g=document.getElementById('grid'),by={};
+  (d.sectors||[]).forEach(s=>by[s.id]=s);
+  const failed={};(d.summary.sectors_failed||[]).forEach(f=>failed[f.id]=f.name);
+  const n=d.summary.sectors_expected||N;let html='';
+  for(let i=1;i<=n;i++)html+=by[i]?sectorHtml(by[i],a):nodataHtml(i,failed[i]||`SECTOR ${i}`);
+  g.innerHTML=html;
+}
 
-            <section class="sector-panel">
-                <div class="panel-head">
-                    <span class="panel-id">SEC-02 // S. DA ABOBOREIRA</span>
-                    <span class="status-dot" id="dot-2"></span>
-                </div>
-                <div class="panel-body">
-                    <img id="sector-img-2" src="/atmos/sector_2.png" class="mq-real-img" alt="SEC-02 Status">
-                    <div class="panel-nodata" id="nodata-2">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
-                </div>
-                <div class="panel-foot" id="foot-2">
-                    <span class="foot-live" id="foot-live-2">—</span>
-                    <span class="foot-con" id="foot-con-2">—</span>
-                    <span class="foot-src" id="foot-src-2">—</span>
-                    <span class="foot-gust" id="foot-gust-2"></span>
-                    <span class="foot-wbgt" id="foot-wbgt-2"></span>
-                    <span class="foot-lp" id="foot-lp-2"></span>
-                </div>
-            </section>
-
-            <section class="sector-panel">
-                <div class="panel-head">
-                    <span class="panel-id">SEC-03 // SERRA DO MARÃO</span>
-                    <span class="status-dot" id="dot-3"></span>
-                </div>
-                <div class="panel-body">
-                    <img id="sector-img-3" src="/atmos/sector_3.png" class="mq-real-img" alt="SEC-03 Status">
-                    <div class="panel-nodata" id="nodata-3">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
-                </div>
-                <div class="panel-foot" id="foot-3">
-                    <span class="foot-live" id="foot-live-3">—</span>
-                    <span class="foot-con" id="foot-con-3">—</span>
-                    <span class="foot-src" id="foot-src-3">—</span>
-                    <span class="foot-gust" id="foot-gust-3"></span>
-                    <span class="foot-wbgt" id="foot-wbgt-3"></span>
-                    <span class="foot-lp" id="foot-lp-3"></span>
-                </div>
-            </section>
-
-            <section class="sector-panel">
-                <div class="panel-head">
-                    <span class="panel-id">SEC-04 // GAVIÃO</span>
-                    <span class="status-dot" id="dot-4"></span>
-                </div>
-                <div class="panel-body">
-                    <img id="sector-img-4" src="/atmos/sector_4.png" class="mq-real-img" alt="SEC-04 Status">
-                    <div class="panel-nodata" id="nodata-4">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
-                </div>
-                <div class="panel-foot" id="foot-4">
-                    <span class="foot-live" id="foot-live-4">—</span>
-                    <span class="foot-con" id="foot-con-4">—</span>
-                    <span class="foot-src" id="foot-src-4">—</span>
-                    <span class="foot-gust" id="foot-gust-4"></span>
-                    <span class="foot-wbgt" id="foot-wbgt-4"></span>
-                    <span class="foot-lp" id="foot-lp-4"></span>
-                </div>
-            </section>
-
-            <section class="sector-panel">
-                <div class="panel-head">
-                    <span class="panel-id">SEC-05 // SERRA DO ALVÃO</span>
-                    <span class="status-dot" id="dot-5"></span>
-                </div>
-                <div class="panel-body">
-                    <img id="sector-img-5" src="/atmos/sector_5.png" class="mq-real-img" alt="SEC-05 Status">
-                    <div class="panel-nodata" id="nodata-5">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
-                </div>
-                <div class="panel-foot" id="foot-5">
-                    <span class="foot-live" id="foot-live-5">—</span>
-                    <span class="foot-con" id="foot-con-5">—</span>
-                    <span class="foot-src" id="foot-src-5">—</span>
-                    <span class="foot-gust" id="foot-gust-5"></span>
-                    <span class="foot-wbgt" id="foot-wbgt-5"></span>
-                    <span class="foot-lp" id="foot-lp-5"></span>
-                </div>
-            </section>
-
-            <section class="sector-panel">
-                <div class="panel-head">
-                    <span class="panel-id">SEC-06 // SRA. GRAÇA</span>
-                    <span class="status-dot" id="dot-6"></span>
-                </div>
-                <div class="panel-body">
-                    <img id="sector-img-6" src="/atmos/sector_6.png" class="mq-real-img" alt="SEC-06 Status">
-                    <div class="panel-nodata" id="nodata-6">NO DATA THIS CYCLE<br>SEM DADOS NESTE CICLO</div>
-                </div>
-                <div class="panel-foot" id="foot-6">
-                    <span class="foot-live" id="foot-live-6">—</span>
-                    <span class="foot-con" id="foot-con-6">—</span>
-                    <span class="foot-src" id="foot-src-6">—</span>
-                    <span class="foot-gust" id="foot-gust-6"></span>
-                    <span class="foot-wbgt" id="foot-wbgt-6"></span>
-                    <span class="foot-lp" id="foot-lp-6"></span>
-                </div>
-            </section>
-
-        </div>
-
-        <footer class="matrix-footer">
-            <div class="footer-brand">MQ ATMOS LAB™ // ULTRA MTB INTELLIGENCE</div>
-            <div class="footer-tech">
-                MULTI-SOURCE: <span>IFS · ICON-EU · IPMA · NASA POWER</span><br>
-                ENGINE: <span>MQ RIDER INDEX™ V3.2 + BELLATOR V21.2</span> | <span>PORTUGAL MICROCLIMATE</span><br>
-                CONSENSUS: <span>ECMWF IFS 0.25° · DWD ICON-EU · IPMA — 0.55/0.35/0.10</span> | <span>WBGT + GUST ACTIVE</span><br>
-                DEVELOPED BY <span>DREAMSPORTS SYSTEMS · DSS</span>
-            </div>
-            <div class="footer-links">
-                <a href="/ghost/">→ EXTENDED FORECAST</a>
-                <a href="/atmos/MQ_TACTICAL_MAP_CALIBRATED.html" target="_blank">→ TACTICAL MAP</a>
-            </div>
-            <div class="atmos-sim-wrap">
-                <a href="/performance-bios/" class="btn-simulate">⚡ SIMULATE RACE CONDITIONS</a>
-            </div>
-        </footer>
-
-    </main>
-
-    <script>
-    (function() {
-        console.log('%c∆ DSS · MQ ATMOS LAB™ · BELLATOR V21.2 · 41.2971,-7.7454', 'color:#F5D800;font-family:monospace;font-weight:bold;font-size:11px');
-
-        // ── CONFIG ──
-        const POLL_MS        = 5 * 60 * 1000;
-        const LIVE_MAX_MIN   = 15;    // LIVE label
-        const TRUST_MAX_MIN  = 30;    // beyond this the alert bar is neutralised
-        const GUST_SHOW_KMH  = 40;
-        const N_SECTORS      = 6;
-
-        // ── UTILITIES ──
-        const esc = v => String(v == null ? '' : v)
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-        function localHHMM(isoUtc) {
-            const d = new Date(isoUtc);
-            if (isNaN(d)) return '—';
-            return d.toLocaleTimeString('pt-PT', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Lisbon' });
-        }
-
-        const STORM_RANK = { 'EXTREME':5, 'SEVERE':4, 'HIGH':3, 'MODERATE':2, 'LOW':1, 'NONE':0 };
-        const HEAT_RANK  = { 'HEAT DANGER':3, 'HEAT WARNING':2, 'HEAT CAUTION':1, 'NONE':0 };
-        const CON_COLORS = { 'AGREE':'#00ff9d', 'UNCERTAIN':'#ffcc00', 'DIVERGENT':'#ff8c00', 'INVALID':'#ff3333' };
-        const IRR_SHORT  = { 'NASA_POWER':'NASA', 'CODE_ESTIMATE':'EST', 'CLEAR_CONFIRMED':'CLR',
-                             'OPEN_METEO':'OM', 'IFS':'IFS', 'ICON':'ICON' };
-
-        // Backend rank (summary.alert_rank / current.status_rank) is the source of truth.
-        // Fallback for a V21.1 JSON without rank: derive from storm/heat/mri.
-        function alertRank(s) {
-            if (typeof s.alert_rank === 'number') return s.alert_rank;
-            const r = STORM_RANK[s.storm_level] || 0, h = HEAT_RANK[s.heat_level] || 0;
-            if (r >= 5 || s.min_mri <= 0) return 90;
-            if (r >= 4 || h >= 3)          return 80;
-            if (r >= 3)                    return 70;
-            if (r >= 2 || h >= 2 || s.min_mri <= 5)  return 60;
-            if (r >= 1 || h >= 1 || s.min_mri <= 10) return 40;
-            return 0;
-        }
-
-        function ageMinutes(data) {
-            const t = new Date(data.timestamp_utc).getTime();
-            return isNaN(t) ? Infinity : (Date.now() - t) / 60000;
-        }
-
-        // ── STATUS INDICATOR ──
-        function updateSystemStatus(data, age) {
-            const s  = data.summary, el = document.getElementById('system-status');
-            if (!el) return;
-            const ce       = data.consensus_engine || {};
-            const rank     = alertRank(s);
-            const divCount = (s.divergent_sectors || []).length;
-            const failed   = (s.sectors_failed || []).length;
-            const flags = [
-                s.ipma_active ? 'IPMA⚠' : '',
-                ce.models_identical_detected ? 'SINGLE MODEL' : '',
-                divCount ? `⚠ ${divCount} DIV` : '',
-                failed ? `✖ ${failed} NO DATA` : '',
-                (HEAT_RANK[s.heat_level]||0) ? `🔥${(s.heat_level||'').split(' ')[1]||''}` : '',
-                (s.max_gust||0) >= GUST_SHOW_KMH ? `G${Math.round(s.max_gust)}` : '',
-            ].filter(Boolean).join(' · ');
-
-            if (age > TRUST_MAX_MIN) {
-                el.textContent = `STALE ${Math.round(age)} MIN · ${localHHMM(data.timestamp_utc)}`;
-                el.className = 'system-indicator crit'; return;
-            }
-            el.textContent = `ONLINE · ${localHHMM(data.timestamp_utc)}${flags ? ' · ' + flags : ''}`;
-            el.className   = 'system-indicator';
-            if (rank >= 70 || failed || ce.models_identical_detected) el.classList.add('crit');
-            else if (rank >= 40)                                       el.classList.add('warn');
-        }
-
-        // ── SOURCES STRIP ──
-        function updateSourcesStrip(data) {
-            const s = data.summary, el = document.getElementById('sources-strip');
-            if (!el) return;
-            const ce       = data.consensus_engine || {};
-            const dropped  = ce.variables_dropped || {};
-            const identical= !!ce.models_identical_detected;
-            const nasa     = s.nasa_power_coverage || '—';
-            const ipmaFc   = s.ipma_forecast_coverage || '—';
-            const aemetOk  = !s.aemet_storm_alert;
-            const divSecs  = s.divergent_sectors || [];
-            const uncSecs  = (s.divergence_log || []).filter(d => d.status === 'UNCERTAIN').map(d => d.sector);
-            const failed   = (s.sectors_failed || []).map(f => f.name);
-
-            const cov = v => { const p = String(v).split('/'); return p[0] === p[1] ? 'src-ok' : 'src-warn'; };
-            const ifsDrop  = Object.values(dropped).some(d => (d.ifs||[]).length);
-            const iconDrop = Object.values(dropped).some(d => (d.icon||[]).length);
-            const modelCell = (name, drop) => identical
-                ? `<span class="src-item"><span class="src-label">${name}</span> <span class="src-err">IDENTICAL</span></span>`
-                : `<span class="src-item"><span class="src-label">${name}</span> <span class="${drop?'src-warn':'src-ok'}">${drop?'✓ −vars':'✓'}</span></span>`;
-
-            let tail = '<span class="src-item"><span style="color:#333">DIVERGENT: —</span></span>';
-            if (identical)            tail = `<span class="src-item src-err">✖ CONSENSUS INVALID — ONE MODEL</span>`;
-            else if (divSecs.length)  tail = `<span class="src-item src-div">⚠ DIV: ${esc(divSecs.join(' · '))}</span>`;
-            else if (uncSecs.length)  tail = `<span class="src-item" style="color:#ffcc00">? UNC: ${esc(uncSecs.join(' · '))}</span>`;
-            if (failed.length) tail += `<span class="src-sep"></span><span class="src-item src-err">✖ NO DATA: ${esc(failed.join(' · '))}</span>`;
-
-            el.innerHTML = `
-                <span class="src-group">
-                    ${modelCell('IFS', ifsDrop)}
-                    ${modelCell('ICON-EU', iconDrop)}
-                    <span class="src-item"><span class="src-label">IPMA</span> <span class="${cov(ipmaFc)}">${esc(ipmaFc)}</span></span>
-                    <span class="src-item"><span class="src-label">NASA</span> <span class="${cov(nasa)}">${esc(nasa)}</span></span>
-                    <span class="src-item"><span class="src-label">AEMET</span> <span class="${aemetOk?'src-ok':'src-err'}">${aemetOk?'OK':'ALERT'}</span></span>
-                </span>
-                <span class="src-sep"></span>
-                ${tail}`;
-        }
-
-        // ── ALERT BAR ──
-        function updateAlertBar(data, age) {
-            const s = data.summary, bar = document.getElementById('alert-bar'), content = document.getElementById('alert-content');
-            if (!bar || !content) return;
-            bar.classList.remove('stale');
-
-            const rank    = alertRank(s);
-            const sRank   = STORM_RANK[s.storm_level] || 0;
-            const hRank   = HEAT_RANK[s.heat_level] || 0;
-            const wbgtTxt = (typeof s.max_wbgt_c === 'number') ? ` | WBGT ${esc(s.max_wbgt_c)}°` : '';
-            const windTxt = `WIND ${esc(s.max_wind)} · GUST ${esc(s.max_gust ?? s.max_wind)} km/h`;
-            const ws      = esc(s.worst_sector), al = esc(s.alert_level), mri = esc(s.min_mri);
-            const ipmaNote  = s.ipma_active ? `<span class="alert-ipma-note">⚠ AVISO IPMA ATIVO</span>` : '';
-            const aemetNote = s.aemet_storm_alert ? `<span class="alert-ipma-note">AEMET: ${esc(s.aemet_alert_text)}</span>` : '';
-
-            // Data too old: never show GO on stale data
-            if (age > TRUST_MAX_MIN) {
-                bar.classList.add('stale');
-                bar.style.backgroundColor = 'rgba(255,255,255,0.04)';
-                bar.style.borderColor     = '#444';
-                content.innerHTML = `
-                    <span class="alert-title" style="color:#aaa;background:rgba(255,255,255,0.06)">⏸ DATA STALE // DADOS DESATUALIZADOS</span>
-                    <div class="alert-msg">Last reading ${Math.round(age)} min ago. Last known: <strong>${ws}</strong> ${al}</div>
-                    <span class="alert-pt">Sem leitura recente — decidir no terreno, não neste painel</span>`;
-                return;
-            }
-
-            if (rank >= 80) {
-                bar.style.backgroundColor = 'rgba(139,0,0,0.2)';
-                bar.style.borderColor     = 'var(--system-crit)';
-                const t = sRank >= 4 ? `🚨 ${esc(s.storm_level)} — CRITICAL ALERT // ALERTA CRÍTICA`
-                        : hRank >= 3 ? `🔥 HEAT DANGER // PERIGO DE CALOR`
-                        : `🚨 CRITICAL ALERT // ALERTA CRÍTICA`;
-                const pt = hRank >= 3 && sRank < 4 ? 'Plano especial de hidratação e ritmo — Risco de golpe de calor nas zonas expostas'
-                                                   : 'CONDIÇÕES EXTREMAS — TOME MÁXIMAS PRECAUÇÕES';
-                content.innerHTML = `
-                    <span class="alert-title" style="color:var(--system-crit);background:rgba(255,0,0,0.15)">${t}</span>
-                    <div class="alert-msg"><strong>${ws}:</strong> ${al} | MRI ${mri}°${wbgtTxt} | ${windTxt}</div>
-                    <span class="alert-pt">${pt}</span>${ipmaNote}${aemetNote}`;
-            } else if (rank >= 70) {
-                bar.style.backgroundColor = 'rgba(255,51,51,0.1)';
-                bar.style.borderColor     = 'var(--system-crit)';
-                content.innerHTML = `
-                    <span class="alert-title" style="color:var(--system-crit)">⚡ ${esc(s.storm_level)} — ${ws}</span>
-                    <div class="alert-msg"><strong>${al}</strong> | MRI ${mri}° | ${windTxt}</div>
-                    <span class="alert-pt">Afastar das zonas expostas — Monitorizar evolução</span>${ipmaNote}`;
-            } else if (rank >= 60) {
-                const heat = hRank >= 1 && sRank < 2;
-                bar.style.backgroundColor = heat ? 'rgba(243,156,18,0.08)' : 'rgba(255,204,0,0.08)';
-                bar.style.borderColor     = heat ? 'var(--system-heat)' : 'var(--system-warn)';
-                content.innerHTML = `
-                    <span class="alert-title" style="color:${heat?'var(--system-heat)':'var(--system-warn)'}">${heat?'🔥 '+esc(s.heat_level)+' // ALERTA DE CALOR':'⚠️ WEATHER ALERT // ALERTA METEOROLÓGICA'}</span>
-                    <div class="alert-msg"><strong>${ws}:</strong> ${al} | MRI ${mri}°${wbgtTxt} | ${windTxt}</div>
-                    <span class="alert-pt">${heat?'Hidratação reforçada — Zonas expostas ao sol a partir das 10h':'Condições desafiantes — Equipamento térmico recomendado'}</span>${ipmaNote}`;
-            } else if (rank >= 40) {
-                const heat = hRank >= 1 && sRank < 1;
-                bar.style.backgroundColor = 'rgba(255,140,0,0.06)';
-                bar.style.borderColor     = heat ? 'var(--system-heat)' : 'var(--system-storm)';
-                content.innerHTML = `
-                    <span class="alert-title" style="color:var(--system-storm)">${heat?'🔥 HEAT CAUTION // ATENÇÃO AO CALOR':'🌩 CAUTION // ATENÇÃO'}</span>
-                    <div class="alert-msg"><strong>${ws}:</strong> ${al}${wbgtTxt} | ${windTxt}</div>
-                    <span class="alert-pt">Monitorizar evolução</span>`;
-            } else if (!s.sectors_ok || s.sectors_ok < (s.sectors_expected || N_SECTORS)) {
-                bar.style.backgroundColor = 'rgba(255,204,0,0.08)';
-                bar.style.borderColor     = 'var(--system-warn)';
-                content.innerHTML = `
-                    <span class="alert-title" style="color:var(--system-warn)">⚠ INCOMPLETE READING // LEITURA INCOMPLETA</span>
-                    <div class="alert-msg">${esc(s.sectors_ok||0)} of ${esc(s.sectors_expected||N_SECTORS)} sectors evaluated. No GO is issued on partial data.</div>
-                    <span class="alert-pt">Sem leitura completa — decidir no terreno, não neste painel</span>`;
-            } else {
-                bar.style.backgroundColor = 'rgba(0,255,157,0.04)';
-                bar.style.borderColor     = 'rgba(0,255,157,0.4)';
-                const n = (data.sectors || []).length;
-                content.innerHTML = `
-                    <span class="alert-title" style="color:var(--system-ok);background:rgba(0,255,157,0.08)">✅ ALL SECTORS: GO // TODOS OS SETORES: VERDE</span>
-                    <div class="alert-msg">Conditions favorable across all ${n} sectors. MIN MRI <strong>${mri}°</strong> | ${windTxt}</div>
-                    <span class="alert-pt">Condições favoráveis — Boa Aventura!</span>`;
-            }
-        }
-
-        // ── DIVERGENCE STRIP ──
-        function updateDivergenceStrip(data) {
-            const s = data.summary, ce = data.consensus_engine || {};
-            const el = document.getElementById('divergence-strip');
-            const txt = document.getElementById('divergence-text');
-            const span = document.getElementById('divergence-sectors');
-            if (!el) return;
-            el.classList.remove('invalid');
-            if (ce.models_identical_detected) {
-                el.classList.add('invalid');
-                if (txt)  txt.innerHTML = '✖ <strong>CONSENSUS INVALID</strong> — IFS and ICON returned identical data: one model, no cross-check —';
-                if (span) span.textContent = 'check models= parameter';
-                el.style.display = 'flex'; return;
-            }
-            const divSecs = s.divergent_sectors || [];
-            if (divSecs.length) {
-                if (txt)  txt.innerHTML = '⚠ <strong>MODEL DIVERGENCE</strong> — IFS vs ICON-EU (T &gt;3°C · P &gt;5mm · W &gt;20 · G &gt;30 km/h) —';
-                if (span) span.textContent = divSecs.join(' · ') + ' — values approximate';
-                el.style.display = 'flex';
-            } else el.style.display = 'none';
-        }
-
-        // ── SECTOR PANELS ──
-        function updateSectorPanels(data) {
-            const present = new Set((data.sectors || []).map(x => x.id));
-            for (let i = 1; i <= N_SECTORS; i++) {
-                const panel = document.getElementById(`dot-${i}`)?.closest('.sector-panel');
-                const dot   = document.getElementById(`dot-${i}`);
-                if (!present.has(i)) {
-                    if (panel) panel.classList.add('nodata');
-                    if (dot) dot.className = 'status-dot nodata';
-                    const con = document.getElementById(`foot-con-${i}`);
-                    if (con) { con.style.color = '#ff3333'; con.textContent = '[NO DATA]'; }
-                    ['src','gust','wbgt','lp'].forEach(k => { const e = document.getElementById(`foot-${k}-${i}`); if (e) e.textContent = ''; });
-                } else if (panel) panel.classList.remove('nodata');
-            }
-
-            (data.sectors || []).forEach(sec => {
-                const c = sec.current, con = sec.consensus || {}, id = sec.id;
-                const heat = c.heat || { wbgt_c: null, heat_level: 'NONE' };
-                const rank = (typeof c.status_rank === 'number') ? c.status_rank : null;
-                const sRank = STORM_RANK[c.storm_level] || 0, hRank = HEAT_RANK[heat.heat_level] || 0;
-
-                const dot = document.getElementById(`dot-${id}`);
-                if (dot) {
-                    dot.className = 'status-dot';
-                    if (rank !== null) {
-                        if (rank >= 70)      dot.classList.add('crit');
-                        else if (rank >= 60) dot.classList.add(sRank >= 2 ? 'storm' : hRank >= 1 ? 'heat' : 'warn');
-                        else if (rank >= 40) dot.classList.add(hRank >= 1 ? 'heat' : 'warn');
-                        else                 dot.classList.add('ok');
-                    } else {
-                        if (sRank >= 4 || c.eei < 0)  dot.classList.add('crit');
-                        else if (sRank >= 2)          dot.classList.add('storm');
-                        else if (hRank >= 2)          dot.classList.add('crit');
-                        else if (hRank >= 1)          dot.classList.add('heat');
-                        else if (c.eei < 5)           dot.classList.add('storm');
-                        else if (c.eei < 10)          dot.classList.add('warn');
-                        else                          dot.classList.add('ok');
-                    }
-                }
-
-                const st = con.status || 'AGREE';
-                const conEl = document.getElementById(`foot-con-${id}`);
-                if (conEl) {
-                    conEl.style.color = CON_COLORS[st] || '#666';
-                    conEl.textContent = st === 'AGREE' ? `[◈${con.sources_active || 2}SRC]`
-                                      : st === 'INVALID' ? '[✖ 1 MODEL]' : `[⚠${st.slice(0,3)}]`;
-                }
-
-                const srcEl = document.getElementById(`foot-src-${id}`);
-                if (srcEl) srcEl.textContent = IRR_SHORT[c.irradiance_source] || c.irradiance_source || '—';
-
-                const gustEl = document.getElementById(`foot-gust-${id}`);
-                if (gustEl) gustEl.textContent = (c.gust || 0) >= GUST_SHOW_KMH ? `G${Math.round(c.gust)}` : '';
-
-                const wbgtEl = document.getElementById(`foot-wbgt-${id}`);
-                if (wbgtEl) {
-                    if (hRank >= 1 && typeof heat.wbgt_c === 'number') {
-                        wbgtEl.style.color = hRank >= 3 ? '#7d0a0a' : hRank >= 2 ? '#e74c3c' : '#f39c12';
-                        wbgtEl.textContent = `🔥${heat.wbgt_c}°`;
-                    } else wbgtEl.textContent = '';
-                }
-
-                const lp = c.lightning_potential || 0;   // LPI, J/kg
-                const lpEl = document.getElementById(`foot-lp-${id}`);
-                if (lpEl) lpEl.innerHTML = lp >= 1
-                    ? `<span style="color:${lp>=10?'#8b0000':lp>=5?'#e74c3c':'#e67e22'}">⚡LPI ${lp.toFixed(0)}</span>` : '';
-            });
-        }
-
-        // ── FRESHNESS ──
-        function updateFreshnessIndicators(age) {
-            const isLive = age < LIVE_MAX_MIN;
-            const label  = isLive ? 'LIVE •' : `STALE ${Math.round(age)}m`;
-            for (let i = 1; i <= N_SECTORS; i++) {
-                const el = document.getElementById(`foot-live-${i}`);
-                if (!el) continue;
-                el.textContent = label;
-                el.className = `foot-live ${isLive ? 'live' : 'stale'}`;
-            }
-        }
-
-        // ── IMAGE REFRESH — keyed to the JSON timestamp, not wall clock ──
-        function refreshImages(data) {
-            const key = encodeURIComponent(data.timestamp_utc || Date.now());
-            for (let i = 1; i <= N_SECTORS; i++) {
-                const img = document.getElementById(`sector-img-${i}`);
-                if (img) img.src = `${img.src.split('?')[0]}?v=${key}`;
-            }
-        }
-
-        // ── MAIN FETCH ──
-        let lastTimestamp = null;
-        async function loadAtmosData() {
-            try {
-                const res = await fetch(`/atmos/status.json?t=${Date.now()}`, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                if (!data || !data.summary) throw new Error('malformed JSON');
-                const age = ageMinutes(data);
-
-                updateSystemStatus(data, age);
-                updateSourcesStrip(data);
-                updateAlertBar(data, age);
-                updateDivergenceStrip(data);
-                updateSectorPanels(data);
-                updateFreshnessIndicators(age);
-                if (data.timestamp_utc !== lastTimestamp) { refreshImages(data); lastTimestamp = data.timestamp_utc; }
-            } catch (e) {
-                console.warn('ATMOS™ JSON unavailable:', e.message);
-                const el = document.getElementById('system-status');
-                if (el) { el.textContent = 'SYSTEM: NO FEED'; el.className = 'system-indicator crit'; }
-            }
-        }
-
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadAtmosData);
-        else loadAtmosData();
-        setInterval(loadAtmosData, POLL_MS);
-        document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAtmosData(); });
-    })();
-    </script>
-
+/* ---------- load ---------- */
+let lastTs=null;
+async function loadField(){
+  try{const r=await fetch(`${FIELD_URL}?t=${Date.now()}`,{cache:'no-store'});if(!r.ok)return;const f=await r.json();
+    if(f.schema_version!==SCHEMA)return;fieldByPoint={};(f.points||[]).forEach(p=>fieldByPoint[p.id]=p);}catch(e){}
+}
+async function load(){
+  try{
+    const r=await fetch(`${STATUS_URL}?t=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();if(!d||!d.summary)throw new Error('malformed');
+    if(d.schema_version!==SCHEMA){const el=document.getElementById('sys');el.textContent=`FEED INCOMPATIBLE · schema ${esc(d.schema_version)}`;el.className='sys crit';return}
+    if(d.timestamp_utc!==lastTs){await loadField();lastTs=d.timestamp_utc}
+    const a=age(d);
+    document.getElementById('ft-ver').textContent=`MQ ATMOS ${d.engine_version||'22'}`;
+    sys(d,a);src(d);alert(d,a);divergence(d);grid(d,a);
+  }catch(e){console.warn('DSS FIELD feed:',e.message);const el=document.getElementById('sys');el.textContent='SYSTEM: NO FEED';el.className='sys crit'}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
+setInterval(load,POLL_MS);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+})();
+</script>
 </body>
 </html>

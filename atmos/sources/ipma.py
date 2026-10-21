@@ -101,6 +101,8 @@ def point_forecast(lat: float, lon: float, altitude_m: int, tz: str,
         if not loc:
             return None
         gid, name = int(loc["globalIdLocal"]), loc.get("local")
+    else:
+        name = next((l.get("local") for l in locations() if int(l.get("globalIdLocal", -1)) == gid), None)
     entries, schema = [], None
     for kind in ("hourly", "daily"):
         try:
