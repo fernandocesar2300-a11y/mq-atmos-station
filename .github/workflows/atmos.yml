@@ -1,7 +1,12 @@
 name: DSS FIELD · ATMOS
 on:
+  # GitHub's schedule is best-effort and on this repo fires hours apart.
+  # The reliable trigger is an external pinger calling repository_dispatch
+  # every 10 min (see README). schedule stays as a fallback only.
+  repository_dispatch:
+    types: [atmos-run]
   schedule:
-    - cron: "7,17,27,37,47,57 * * * *"   # :x7 — GitHub delays :00 jobs
+    - cron: "7,37 * * * *"
   workflow_dispatch:
     inputs:
       event: { description: "events/<name>.yaml", default: "events/mq.yaml" }
