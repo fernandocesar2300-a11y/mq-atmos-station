@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple
 from ..clock import now_utc, parse_local_naive
 
 WARNINGS_URL  = "https://api.ipma.pt/open-data/forecast/warnings/warnings_www.json"
-LOCATIONS_URL = "https://api.ipma.pt/open-data/forecast/locations.json"
+LOCATIONS_URL = "https://api.ipma.pt/open-data/distrits-islands.json"   # forecast points index
 CITY_URL      = "https://api.ipma.pt/open-data/forecast/meteorology/cities/{kind}/{gid}.json"
 
 STORM_TYPES = {"Trovoada", "Precipitação", "Neve", "Vento"}
@@ -80,8 +80,12 @@ def to_storm_status(level: Optional[str], texts: List[str]):
 def locations() -> List[dict]:
     if "locations" not in _cache:
         try:
-            _cache["locations"] = _json(LOCATIONS_URL)
-        except Exception:
+            raw = _json(LOCATIONS_URL)
+            data = raw.get("data", raw) if isinstance(raw, dict) else raw
+            _cache["locations"] = [l for l in data if l.get("globalIdLocal") and l.get("latitude") and l.get("longitude")]
+            print(f"IPMA locations: {len(_cache['locations'])} forecast points")
+        except Exception as e:
+            print(f"IPMA locations FAILED: {e}")
             _cache["locations"] = []
     return _cache["locations"]
 
