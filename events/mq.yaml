@@ -4,7 +4,7 @@ timezone: Europe/Lisbon
 event_date: 2027-06-12          # ajustar
 gpx_path: MQ_TRACK.gpx
 calibration_path: aemet_corrections.json
-publish_dir: test              # FTP root = mountainquest.pt/atmos/ · poner "" en el cutover
+publish_dir: ""                # FTP root = mountainquest.pt/atmos/
 aemet_area: "61"
 window: { start_local: 8, end_local: 20 }
 thresholds: { rain_mmh: 0.5, gust_kmh: 50, cold_c: 5, heat_c: 28 }

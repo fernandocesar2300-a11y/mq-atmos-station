@@ -184,6 +184,20 @@ def run(event_path: str, products: list, publish: bool, cards: bool, out_root: s
         except Exception:
             pass
 
+    # Legacy names (V21 consumers: Ghost Rider, BIOS, old panel). Remove after migration.
+    if want_status and (out_dir / "status.json").exists():
+        files.append((str(out_dir / "status.json"), "MQ_ATMOS_STATUS.json"))
+        if cards:
+            for i in range(1, len(event.points) + 1):
+                cp = out_dir / f"sector_{i}.png"
+                if cp.exists():
+                    files.append((str(cp), f"MQ_SECTOR_{i}_STATUS.png"))
+            if (out_dir / "banner.png").exists():
+                files.append((str(out_dir / "banner.png"), "MQ_HOME_BANNER.png"))
+    web = pathlib.Path("web/track-status.html")
+    if web.exists():
+        files.append((str(web), "track-status.html"))
+
     files.append((str(out_dir / "atmos_log.txt"), "atmos_log.txt"))
     if publish:
         try:
