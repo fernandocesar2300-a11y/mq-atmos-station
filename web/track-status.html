@@ -942,13 +942,20 @@
                     <span class="alert-title" style="color:var(--system-storm)">${heat?'🔥 HEAT CAUTION // ATENÇÃO AO CALOR':'🌩 CAUTION // ATENÇÃO'}</span>
                     <div class="alert-msg"><strong>${ws}:</strong> ${al}${wbgtTxt} | ${windTxt}</div>
                     <span class="alert-pt">Monitorizar evolução</span>`;
+            } else if (!s.sectors_ok || s.sectors_ok < (s.sectors_expected || N_SECTORS)) {
+                bar.style.backgroundColor = 'rgba(255,204,0,0.08)';
+                bar.style.borderColor     = 'var(--system-warn)';
+                content.innerHTML = `
+                    <span class="alert-title" style="color:var(--system-warn)">⚠ INCOMPLETE READING // LEITURA INCOMPLETA</span>
+                    <div class="alert-msg">${esc(s.sectors_ok||0)} of ${esc(s.sectors_expected||N_SECTORS)} sectors evaluated. No GO is issued on partial data.</div>
+                    <span class="alert-pt">Sem leitura completa — decidir no terreno, não neste painel</span>`;
             } else {
                 bar.style.backgroundColor = 'rgba(0,255,157,0.04)';
                 bar.style.borderColor     = 'rgba(0,255,157,0.4)';
                 const n = (data.sectors || []).length;
                 content.innerHTML = `
                     <span class="alert-title" style="color:var(--system-ok);background:rgba(0,255,157,0.08)">✅ ALL SECTORS: GO // TODOS OS SETORES: VERDE</span>
-                    <div class="alert-msg">Conditions favorable across ${n} of ${N_SECTORS} sectors. MIN MRI <strong>${mri}°</strong> | ${windTxt}</div>
+                    <div class="alert-msg">Conditions favorable across all ${n} sectors. MIN MRI <strong>${mri}°</strong> | ${windTxt}</div>
                     <span class="alert-pt">Condições favoráveis — Boa Aventura!</span>`;
             }
         }
@@ -1037,10 +1044,10 @@
                     } else wbgtEl.textContent = '';
                 }
 
-                const lp = c.lightning_potential || 0;
+                const lp = c.lightning_potential || 0;   // LPI, J/kg
                 const lpEl = document.getElementById(`foot-lp-${id}`);
-                if (lpEl) lpEl.innerHTML = lp > 10
-                    ? `<span style="color:${lp>50?'#8b0000':lp>30?'#e74c3c':'#e67e22'}">⚡${lp.toFixed(0)}%</span>` : '';
+                if (lpEl) lpEl.innerHTML = lp >= 1
+                    ? `<span style="color:${lp>=10?'#8b0000':lp>=5?'#e74c3c':'#e67e22'}">⚡LPI ${lp.toFixed(0)}</span>` : '';
             });
         }
 

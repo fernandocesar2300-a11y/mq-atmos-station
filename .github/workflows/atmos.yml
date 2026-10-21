@@ -31,7 +31,7 @@ jobs:
           FTP_PASS: ${{ secrets.FTP_PASS }}
           AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-        run: python -m atmos.run --event "${{ github.event.inputs.event || 'events/mq.yaml' }}" --products status,field --publish
+        run: python -m atmos.run --event "${{ github.event.inputs.event || 'events/mq.yaml' }}" --products status,field --publish --cards
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: atmos-output, path: output, retention-days: 30 }

@@ -45,7 +45,7 @@ PLAUSIBLE = {   # inclusive bounds; outside → None and counted as rejected
     "cape": (0.0, 8000.0),
     "lifted_index": (-20.0, 40.0),
     "convective_inhibition": (-2000.0, 0.0),
-    "lightning_potential": (0.0, 1.0),
+    "lightning_potential": (0.0, 200.0),   # LPI, J/kg (not a probability)
 }
 
 HEADERS = {"User-Agent": f"DSS-ATMOS/{ENGINE_VERSION} (fernando@dreamsports.pt)"}

@@ -49,11 +49,21 @@ def publish(files: List[Tuple[str, str]], remote_dir: str) -> str:
                 ftp.storbinary(f"STOR {remote}.tmp", f)
             staged.append(remote)
         for remote in staged:
+            had_old = True
             try:
-                ftp.delete(remote)
+                ftp.rename(remote, f"{remote}.bak")
             except ftplib.error_perm:
-                pass
-            ftp.rename(f"{remote}.tmp", remote)
+                had_old = False          # no previous file
+            try:
+                ftp.rename(f"{remote}.tmp", remote)
+            except Exception:
+                if had_old:
+                    try: ftp.rename(f"{remote}.bak", remote)   # restore previous product
+                    except Exception: pass
+                raise
+            if had_old:
+                try: ftp.delete(f"{remote}.bak")
+                except Exception: pass
         ftp.quit()
         return f"{mode} → {remote_dir or '/'} · {len(staged)} files"
     except Exception as e:

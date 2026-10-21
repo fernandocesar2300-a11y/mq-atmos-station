@@ -22,6 +22,7 @@ reading and `degraded_at_utc` the failed run. Never render degraded data as live
 | `sectors[].current.status_rank` | int | Same scale as `alert_rank` |
 | `sectors[].current.eei` | int | MQ Rider Index (°). Ghost Rider pace input |
 | `sectors[].current.gust` | km/h | Exposure-corrected gust |
+| `sectors[].current.lightning_potential` | J/kg | ICON Lightning Potential Index. ≥1 possible · ≥5 likely · ≥10 high. NOT a percentage |
 | `sectors[].current.heat.wbgt_c` | °C | Always present; label only inside window |
 | `sectors[].consensus.status` | AGREE/UNCERTAIN/DIVERGENT/INVALID | |
 | `sectors[].forecast_3h` / `forecast_6h` | | temp, wind, gust, rain, code, eei, lightning_potential |

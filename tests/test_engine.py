@@ -88,8 +88,17 @@ def test_storm_dual_confirmation(monkeypatch):
     monkeypatch.setattr(ipma, "active_for_areas", lambda areas, tz: (False, None, []))
     assert storm.evaluate([], "Europe/Lisbon", 96, 100, 0, 0, 0, hail_confirmed=False)[2] == "HIGH"
     assert storm.evaluate([], "Europe/Lisbon", 96, 100, 0, 0, 0, hail_confirmed=True)[2] == "EXTREME"
-    assert storm.evaluate([], "Europe/Lisbon", 95, 3000, -5, 0, 0.6, storm_confirmed=False)[2] == "MODERATE"
-    assert storm.evaluate([], "Europe/Lisbon", 95, 3000, -5, 0, 0.6, storm_confirmed=True)[2] == "SEVERE"
+    assert storm.evaluate([], "Europe/Lisbon", 95, 3000, -5, 0, 12.0, storm_confirmed=False)[2] == "MODERATE"
+    assert storm.evaluate([], "Europe/Lisbon", 95, 3000, -5, 0, 12.0, storm_confirmed=True)[2] == "SEVERE"
+
+
+def test_lpi_is_joules_not_fraction(monkeypatch):
+    monkeypatch.setattr(ipma, "active_for_areas", lambda areas, tz: (False, None, []))
+    assert openmeteo.plausible("lightning_potential", 14.2) == 14.2
+    assert storm.evaluate([], "Europe/Lisbon", 3, 500, 0, 0, 0.4)[2] == "NONE"
+    assert storm.evaluate([], "Europe/Lisbon", 3, 500, 0, 0, 2.0)[2] == "LOW"
+    assert storm.evaluate([], "Europe/Lisbon", 3, 500, 0, 0, 6.0)[2] == "MODERATE"
+    assert storm.evaluate([], "Europe/Lisbon", 3, 500, 0, 0, 14.0)[2] == "SEVERE"
 
 
 def test_storm_ipma_override(monkeypatch):

@@ -7,6 +7,8 @@ from typing import List, Optional
 
 from ..sources import ipma as ipma_src
 
+LPI_POSSIBLE, LPI_LIKELY, LPI_HIGH = 1.0, 5.0, 10.0   # J/kg
+
 COLORS = {"EXTREME": "#4a0000", "SEVERE": "#8b0000", "HIGH": "#c0392b", "MODERATE": "#e67e22", "LOW": "#e67e22"}
 
 
@@ -31,14 +33,16 @@ def evaluate(ipma_areas: List[str], tz: str, code: int, cape, li, cin, lp,
                 else ("HAIL POSSIBLE", COLORS["HIGH"], "HIGH", []))
     if 95 <= code <= 99:
         if storm_confirmed:
-            if cape > 2500 or lp > 0.5:
+            if cape > 2500 or lp >= LPI_HIGH:
                 return "SEVERE THUNDERSTORM", COLORS["SEVERE"], "SEVERE", []
             return "THUNDERSTORM", COLORS["HIGH"], "HIGH", []
         return "STORM POSSIBLE", COLORS["MODERATE"], "MODERATE", []
 
-    if lp > 0.5: return "LIGHTNING RISK — HIGH", COLORS["SEVERE"], "SEVERE", []
-    if lp > 0.3: return "LIGHTNING RISK", "#e74c3c", "MODERATE", []
-    if lp > 0.1: return "LIGHTNING POSSIBLE", COLORS["LOW"], "LOW", []
+    # Lightning Potential Index (ICON), J/kg. Bands after Lynn & Yair 2010 / DWD guidance:
+    # >= 1 possible, >= 5 likely, >= 10 high.
+    if lp >= LPI_HIGH:     return "LIGHTNING RISK — HIGH", COLORS["SEVERE"], "SEVERE", []
+    if lp >= LPI_LIKELY:   return "LIGHTNING RISK", "#e74c3c", "MODERATE", []
+    if lp >= LPI_POSSIBLE: return "LIGHTNING POSSIBLE", COLORS["LOW"], "LOW", []
 
     if cin >= -200:
         if cape > 2500 and li < -4: return "STORM IMMINENT", COLORS["SEVERE"], "SEVERE", []

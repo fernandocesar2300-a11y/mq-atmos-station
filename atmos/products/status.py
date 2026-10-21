@@ -77,7 +77,7 @@ def evaluate_point(event, point, fetched: Dict, ipma_fc: Optional[dict], aemet, 
     def fc(off):
         c, _, _ = slots[off]
         return {"temp": c["temp"], "wind": c["wind"], "gust": c["gust"], "rain": c["rain"], "code": c["code"],
-                "lightning_potential": round((c.get("lightning_potential") or 0) * 100, 1)}
+                "lightning_potential": round(c.get("lightning_potential") or 0, 1)}
 
     return {
         "id": point.id, "name": point.name,
@@ -90,7 +90,7 @@ def evaluate_point(event, point, fetched: Dict, ipma_fc: Optional[dict], aemet, 
             "freezing_level": d0["freezing_level"], "code": d0["code"],
             "snow_detected": snow or mixed, "snow_intensity": snow_int,
             "cape": round(d0["cape"], 0), "lifted_index": round(d0["lifted_index"], 1), "cin": round(d0["cin"], 0),
-            "lightning_potential": round((d0.get("lightning_potential") or 0) * 100, 1),
+            "lightning_potential": round(d0.get("lightning_potential") or 0, 1),   # LPI J/kg
             "storm_level": storm_level, "ipma_warnings": ipma_texts,
             "heat": {"wbgt_c": wbgt, "heat_level": heat_level, "in_window": _in_window(ts0, event)},
             "microclimate_notes": d0.get("fog_alert") or d0.get("mtb_hazard"),

@@ -19,8 +19,8 @@ def sector_card(sec: dict, out_path: str, version: str) -> None:
     plt.text(0.92, 0.55, f"MRI: {c['eei']}°", color=mri_col, fontsize=10, fontweight="bold", ha="right", transform=T)
     plt.text(0.08, 0.45, f"WIND {int(c['wind'])} · GUST {int(c['gust'])} km/h", color="#e67e22" if c["gust"] >= 40 else "#94a3b8", fontsize=9, transform=T)
     lp = c.get("lightning_potential", 0)
-    if lp > 10:
-        plt.text(0.92, 0.45, f"⚡ {int(lp)}%", color="#8b0000" if lp > 50 else "#e74c3c" if lp > 30 else "#e67e22", fontsize=8, fontweight="bold", ha="right", transform=T)
+    if lp >= 1:
+        plt.text(0.92, 0.45, f"⚡ LPI {lp:.0f}", color="#8b0000" if lp >= 10 else "#e74c3c" if lp >= 5 else "#e67e22", fontsize=8, fontweight="bold", ha="right", transform=T)
     con = sec["consensus"]; st = con["status"]
     lbl = "⚠ SINGLE MODEL" if st == "INVALID" else (f"◈ {con['sources_active']}SRC AGREE" if st == "AGREE" else f"{'⚠' if st=='DIVERGENT' else '?'} IFS:{con['ifs_temp']}° ICON:{con['icon_temp']}° G±{con['gust_spread']:.0f}")
     plt.text(0.08, 0.35, lbl, color={"INVALID": "#e74c3c", "DIVERGENT": "#e67e22", "UNCERTAIN": "#f1c40f"}.get(st, "#475569"), fontsize=9, fontweight="bold", transform=T)
