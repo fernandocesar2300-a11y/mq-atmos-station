@@ -13,6 +13,12 @@ STORM_TYPES = {"Trovoada", "Precipitação", "Neve", "Vento"}
 LEVEL_RANK  = {"red": 4, "orange": 3, "yellow": 2, "green": 0}
 LAPSE_C_PER_M = 0.0065
 
+# Altitude (m) of IPMA forecast points used as anchors. Unknown gid → temperature not anchored.
+STATION_ALT = {
+    1171400: 460,   # Vila Real
+    1130800: 230,   # Amarante (verify: IPMA point is the town, ~230 m)
+}
+
 _WTYPE_TO_CODE = {1: 0, 2: 1, 3: 2, 4: 3, 5: 45, 6: 51, 7: 61, 8: 63, 9: 80, 10: 80,
                   11: 82, 12: 95, 13: 96, 14: 71, 15: 77}
 _WIND_CLASS_KPH = {1: 7, 2: 20, 3: 31, 4: 45, 5: 60}
@@ -111,6 +117,7 @@ def point_forecast(lat: float, lon: float, altitude_m: int, tz: str,
         except Exception:
             continue
     if not entries:
+        print(f"IPMA point {gid} ({name}): no forecast entries")
         return None
     from ..clock import to_local
     import datetime
@@ -127,6 +134,8 @@ def point_forecast(lat: float, lon: float, altitude_m: int, tz: str,
     if temp is None and best.get("tMin") is not None and best.get("tMax") is not None:
         temp = (float(best["tMin"]) + float(best["tMax"])) / 2.0
     temp = float(temp) if temp is not None else None
+    if station_alt is None:
+        station_alt = STATION_ALT.get(gid)
     if temp is not None:
         temp = temp - (altitude_m - station_alt) * LAPSE_C_PER_M if station_alt is not None else None
     return {

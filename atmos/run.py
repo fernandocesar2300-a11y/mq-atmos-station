@@ -112,7 +112,11 @@ def run(event_path: str, products: list, publish: bool, cards: bool, out_root: s
     ipma_fc = {}
     if want_status:
         for p in event.points:
+            loc = ipma.nearest_location(p.lat, p.lon)
             r = ipma.point_forecast(p.lat, p.lon, p.altitude_m, event.timezone, p.ipma_station_gid, p.ipma_station_alt)
+            log.info("IPMA anchor %-20s nearest=%s (%s) → %s", p.name,
+                     loc.get("local") if loc else None, loc.get("globalIdLocal") if loc else None,
+                     (r["source"] + (" T=%.1f" % r["temp"] if r.get("temp") is not None else " T=unanchored")) if r else "NO DATA")
             if r:
                 ipma_fc[p.id] = r
         nasa_cache = nasa.fetch_all(event.points, ts_now)
