@@ -16,18 +16,12 @@ Layout: `atmos/sources` (Open-Meteo, IPMA, AEMET, NASA) · `atmos/physics` (EEI,
 
 Contract for consumers: ATMOS_CONTRACT.md.
 
-## Scheduling (read this)
+## Scheduling
 
-GitHub `schedule` is best-effort: on this repository it fires every 2–5 h, not every 10 min.
-The engine is triggered from outside. One-time setup:
+GitHub `schedule` is best-effort (hours apart on this repo), so the workflow does not rely on it:
+each run is a 5h40 loop that executes the engine every 10 minutes. The next run (cron every 2 h,
+a push to `main`, or a manual dispatch) cancels the loop and takes over, so coverage is continuous
+and a merge deploys new code within a minute. No external pinger needed; `repository_dispatch`
+(`atmos-run`) remains available if one is ever wanted.
 
-1. GitHub → Settings → Developer settings → Fine-grained personal access token:
-   repository `mq-atmos-station`, permission **Contents: read and write** (needed for `repository_dispatch`). Copy the token.
-2. cron-job.org (free) → Create cronjob:
-   - URL `https://api.github.com/repos/fernandocesar2300-a11y/mq-atmos-station/dispatches`
-   - Schedule: every 10 minutes
-   - Request method POST, body `{"event_type":"atmos-run"}`
-   - Headers: `Authorization: Bearer <token>` · `Accept: application/vnd.github+json` · `User-Agent: dss-atmos-pinger`
-3. Save. Each ping starts one run (≈1 min). `concurrency` in the workflow prevents overlap.
-
-Healthchecks.io (`HEALTHCHECK_URL` secret) is the independent watchdog: if no run completes for 20 min, it alerts.
+Watchdog: `HEALTHCHECK_URL` secret (healthchecks.io, period 10 min, grace 10 min) alerts when no run completes.
