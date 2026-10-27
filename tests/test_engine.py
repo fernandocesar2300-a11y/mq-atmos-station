@@ -162,7 +162,7 @@ def test_field_product_with_ensemble():
     assert day["astro"]["sunrise"] and day["astro"]["civil_dusk"]
     h = day["hours"][0]
     assert h["ensemble"]["p_rain"] == 0.3 and h["ensemble"]["p_cold"] == 0.5
-    assert 8 <= int(h["time_local"][:2]) <= 20
+    assert EVENT.window.start_local <= int(h["time_local"][:2]) <= EVENT.window.end_local
     fd = field_prod.build(EVENT, {p.id: fp}, [], TS)
     json.dumps(fd)
     assert fd["points_ok"] == 1 and fd["product"] == "field"
