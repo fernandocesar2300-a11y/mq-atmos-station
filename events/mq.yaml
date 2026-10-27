@@ -6,7 +6,7 @@ gpx_path: MQ_TRACK.gpx
 calibration_path: aemet_corrections.json
 publish_dir: ""                # FTP root = mountainquest.pt/atmos/
 aemet_area: "61"
-window: { start_local: 8, end_local: 20 }
+window: { start_local: 5, end_local: 23 }   # saída 05:00 · meta 00:00 (Mutante 22:00)
 thresholds: { rain_mmh: 0.5, gust_kmh: 50, cold_c: 5, heat_c: 28 }
 points:
   - { id: 1, name: AMARANTE,         lat: 41.2709, lon: -8.0797, altitude_m: 65,   terrain: FLAT,    description: START / BASE,   ipma_areas: [PTO, AVR, BRG] }
