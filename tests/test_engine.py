@@ -13,7 +13,7 @@ from atmos.products import field as field_prod, status as status_prod
 from atmos.sources import ipma, openmeteo
 
 EVENT = load_event(str(pathlib.Path(__file__).resolve().parents[1] / "events" / "mq.yaml"))
-TS = datetime.datetime(2027, 6, 12, 12, 0, tzinfo=UTC)   # 13h Lisboa, event day
+TS = datetime.datetime(2027, 6, 19, 12, 0, tzinfo=UTC)   # 13h Lisboa, event day
 
 
 def synth_models(hours=48, t0=TS.replace(hour=0), ifs_t=12.0, icon_t=14.0, identical=False, code=3):
@@ -162,7 +162,7 @@ def test_field_product_with_ensemble():
     assert day["astro"]["sunrise"] and day["astro"]["civil_dusk"]
     h = day["hours"][0]
     assert h["ensemble"]["p_rain"] == 0.3 and h["ensemble"]["p_cold"] == 0.5
-    assert 8 <= int(h["time_local"][:2]) <= 20
+    assert EVENT.window.start_local <= int(h["time_local"][:2]) <= EVENT.window.end_local
     fd = field_prod.build(EVENT, {p.id: fp}, [], TS)
     json.dumps(fd)
     assert fd["points_ok"] == 1 and fd["product"] == "field"
