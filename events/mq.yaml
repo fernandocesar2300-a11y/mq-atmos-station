@@ -1,7 +1,7 @@
 slug: mq
 name: Mountain Quest
 timezone: Europe/Lisbon
-event_date: 2027-06-12          # ajustar
+event_date: 2027-06-19          # sábado, confirmado out 2026
 gpx_path: MQ_TRACK.gpx
 calibration_path: aemet_corrections.json
 publish_dir: ""                # FTP root = mountainquest.pt/atmos/
