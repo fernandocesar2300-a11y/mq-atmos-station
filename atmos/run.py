@@ -109,6 +109,17 @@ def run(event_path: str, products: list, publish: bool, cards: bool, out_root: s
 
     aemet_res = aemet.storm_alerts(event.aemet_area)
     log.info("AEMET: %s", aemet_res[1])
+    # Declared sources that did not answer. A silent failure reads as "no warning", which is a false all-clear.
+    sources_failed = []
+    if event.aemet_area and not aemet_res[1].startswith("AEMET:"):
+        sources_failed.append(aemet_res[1])
+    ipma_pending = ipma.pending_for_areas(event.ipma_districts, event.timezone)
+    if not ipma.warnings_ok():
+        sources_failed.append("IPMA warnings unreachable")
+    for w in ipma_pending:
+        log.info("IPMA %s %-14s %s → %s %s%s", w["level"].upper(), w["type"], w["start_local"], w["end_local"], ",".join(w["areas"]), "" if w["active"] else " (announced)")
+    if sources_failed:
+        log.error("SOURCES FAILED: %s", "; ".join(sources_failed))
     ipma_fc = {}
     if want_status:
         for p in event.points:
@@ -146,6 +157,8 @@ def run(event_path: str, products: list, publish: bool, cards: bool, out_root: s
         ipma_active = any(ipma.active_for_areas(p.ipma_areas, event.timezone)[0] for p in event.points)
         st = status_prod.build(event, per_point, failed, aemet_res, ipma_active,
                                f"{len(nasa_cache)}/{len(event.points)}", f"{len(ipma_fc)}/{len(event.points)}", ts_now)
+        st["sources_failed"] = sources_failed
+        st["summary"]["ipma_upcoming"] = [w for w in ipma_pending if not w["active"]]
         path = out_dir / "status.json"; path.write_text(json.dumps(st, indent=2, ensure_ascii=False), encoding="utf-8")
         log.info("STATUS: %s rank %s @ %s · ok %d/%d", st["summary"]["alert_level"], st["summary"]["alert_rank"],
                  st["summary"]["worst_sector"], st["summary"]["sectors_ok"], st["summary"]["sectors_expected"])
@@ -171,7 +184,7 @@ def run(event_path: str, products: list, publish: bool, cards: bool, out_root: s
             except Exception as e:
                 log.error("%s field failed: %s", p.name, traceback.format_exc(limit=2))
                 ffailed.append({"id": p.id, "name": p.name, "error": str(e)[:160]})
-        fd = field_prod.build(event, per_point, ffailed, ts_now)
+        fd = field_prod.build(event, per_point, ffailed, ts_now, ipma_pending, sources_failed)
         path = out_dir / "field.json"; path.write_text(json.dumps(fd, indent=2, ensure_ascii=False), encoding="utf-8")
         files.append((str(path), "field.json"))
 

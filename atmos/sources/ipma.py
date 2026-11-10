@@ -34,10 +34,56 @@ def _json(url: str, timeout: int = 8):
 def warnings(tz: str = "Europe/Lisbon") -> List[dict]:
     if "warnings" not in _cache:
         try:
-            _cache["warnings"] = _json(WARNINGS_URL)
+            _cache["warnings"] = _json(WARNINGS_URL); _cache["warnings_ok"] = True
         except Exception:
-            _cache["warnings"] = []
+            _cache["warnings"] = []; _cache["warnings_ok"] = False
     return _cache["warnings"]
+
+
+def warnings_ok() -> bool:
+    """False when the warnings feed could not be read (an empty list then means 'unknown', not 'no warnings')."""
+    warnings()
+    return bool(_cache.get("warnings_ok"))
+
+
+PLANNING_EXCLUDED = {"Agitação Marítima"}   # sea state: irrelevant inland
+
+
+def pending_for_areas(areas: List[str], tz: str = "Europe/Lisbon") -> List[dict]:
+    """Yellow+ warnings for the given areas that have not expired: active AND future.
+
+    active_for_areas() only sees `start <= now <= end`, so a warning issued today for
+    tomorrow was invisible to every consumer until it began. Planning products need it
+    the moment IPMA publishes it. Same warning in several areas is merged into one row.
+    Times stay local-naive, exactly as IPMA publishes them.
+    """
+    now = now_utc()
+    rows: Dict[tuple, dict] = {}
+    for w in warnings(tz):
+        area = w.get("idAreaAviso"); wtype = w.get("awarenessTypeName", "")
+        if area not in areas or wtype in PLANNING_EXCLUDED:
+            continue
+        level = w.get("awarenessLevelID", "green"); rank = LEVEL_RANK.get(level, 0)
+        if rank < 2:
+            continue
+        try:
+            start = parse_local_naive(w["startTime"], tz); end = parse_local_naive(w["endTime"], tz)
+        except Exception:
+            continue
+        if end <= now:
+            continue
+        key = (wtype, level, w["startTime"], w["endTime"])
+        row = rows.setdefault(key, {"type": wtype, "level": level, "rank": rank,
+                                    "start_local": w["startTime"], "end_local": w["endTime"],
+                                    "active": start <= now, "text": (w.get("text") or "").strip(), "areas": []})
+        if area not in row["areas"]:
+            row["areas"].append(area)
+    return sorted(rows.values(), key=lambda r: (-r["rank"], r["start_local"]))
+
+
+def for_date(pending: List[dict], date_local: str) -> List[dict]:
+    """Subset of pending_for_areas() rows that cover local date YYYY-MM-DD (a warning ending at 00:00 does not cover that day)."""
+    return [r for r in pending if r["start_local"][:10] <= date_local and r["end_local"] > date_local + "T00:00:00"]
 
 
 def active_for_areas(areas: List[str], tz: str = "Europe/Lisbon") -> Tuple[bool, Optional[str], List[str]]:

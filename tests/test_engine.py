@@ -163,9 +163,15 @@ def test_field_product_with_ensemble():
     h = day["hours"][0]
     assert h["ensemble"]["p_rain"] == 0.3 and h["ensemble"]["p_cold"] == 0.5
     assert EVENT.window.start_local <= int(h["time_local"][:2]) <= EVENT.window.end_local
-    fd = field_prod.build(EVENT, {p.id: fp}, [], TS)
+    s0 = day["summary"]
+    assert s0["rain_max_1h"] <= s0["rain_max_6h"] <= s0["rain_total"]
+    d0 = fp["days"][0]["date"]
+    pend = [{"type": "Precipitação", "level": "orange", "rank": 3, "start_local": d0 + "T09:00:00", "end_local": d0 + "T21:00:00", "active": False, "text": "x", "areas": ["PTO", "VRL"]}]
+    fd = field_prod.build(EVENT, {p.id: fp}, [], TS, pend, ["AEMET HTTP 401"])
     json.dumps(fd)
     assert fd["points_ok"] == 1 and fd["product"] == "field"
+    assert fd["ipma_districts"] == ["PTO", "VRL"] and fd["sources_failed"] == ["AEMET HTTP 401"]
+    assert fd["points"][0]["days"][0]["ipma_warnings"] == pend and fd["points"][0]["days"][1]["ipma_warnings"] == []
 
 
 def test_calibration_guards(tmp_path):
@@ -184,3 +190,33 @@ def test_calibration_guards(tmp_path):
     d = mc.apply(EVENT.points[0], {"temp": 10.0, "wind": 10.0, "gust": 20.0, "hum": 50, "rain": 0, "irradiance": 100, "code": 0},
                  TS, "Europe/Lisbon", calib=ok["A"])
     assert d["temp"] == 11.2 and d["wind"] == 8.0 and d["gust"] == 16.0
+
+
+def _fake_warnings(monkeypatch, rows):
+    monkeypatch.setitem(ipma._cache, "warnings", rows); monkeypatch.setitem(ipma._cache, "warnings_ok", True)
+
+
+def test_ipma_pending_includes_announced_and_merges_areas(monkeypatch):
+    """Regression 2026-11-10: orange rain warning for the 11th was invisible until it began."""
+    now = datetime.datetime(2026, 11, 10, 21, 40, tzinfo=UTC)
+    monkeypatch.setattr(ipma, "now_utc", lambda: now)
+    w = lambda area, typ, lvl, s, e: {"idAreaAviso": area, "awarenessTypeName": typ, "awarenessLevelID": lvl, "startTime": s, "endTime": e, "text": "x"}
+    _fake_warnings(monkeypatch, [
+        w("PTO", "Precipitação", "orange", "2026-11-11T09:00:00", "2026-11-11T21:00:00"),
+        w("VRL", "Precipitação", "orange", "2026-11-11T09:00:00", "2026-11-11T21:00:00"),
+        w("PTO", "Agitação Marítima", "yellow", "2026-11-10T18:46:00", "2026-11-11T06:00:00"),   # sea state: excluded
+        w("PTO", "Vento", "yellow", "2026-11-10T06:00:00", "2026-11-10T18:00:00"),                # expired
+        w("AVR", "Vento", "yellow", "2026-11-11T12:00:00", "2026-11-11T21:00:00"),                # other district
+        w("VRL", "Neve", "green", "2026-11-11T00:00:00", "2026-11-12T00:00:00"),                  # green
+    ])
+    assert ipma.active_for_areas(["PTO", "VRL"])[0] is False          # the old view: nothing
+    pend = ipma.pending_for_areas(["PTO", "VRL"])
+    assert len(pend) == 1 and pend[0]["level"] == "orange" and pend[0]["active"] is False
+    assert pend[0]["areas"] == ["PTO", "VRL"]
+    assert ipma.for_date(pend, "2026-11-11") == pend
+    assert ipma.for_date(pend, "2026-11-10") == [] and ipma.for_date(pend, "2026-11-12") == []
+
+
+def test_ipma_for_date_midnight_end_does_not_cover_next_day():
+    row = {"start_local": "2026-11-11T09:00:00", "end_local": "2026-11-12T00:00:00"}
+    assert ipma.for_date([row], "2026-11-11") == [row] and ipma.for_date([row], "2026-11-12") == []

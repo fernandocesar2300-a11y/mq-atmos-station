@@ -6,6 +6,7 @@ gpx_path: MQ_TRACK.gpx
 calibration_path: aemet_corrections.json
 publish_dir: ""                # FTP root = mountainquest.pt/atmos/
 aemet_area: "61"
+ipma_districts: [PTO, VRL]     # distritos que o traçado atravessa: avisos IPMA por dia em field.json
 window: { start_local: 5, end_local: 23 }   # saída 05:00 · meta 00:00 (Mutante 22:00)
 thresholds: { rain_mmh: 0.5, gust_kmh: 50, cold_c: 5, heat_c: 28 }
 points:
