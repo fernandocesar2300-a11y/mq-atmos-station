@@ -18,6 +18,7 @@ from .. import ENGINE_VERSION, SCHEMA_VERSION
 from ..clock import now_utc, to_local, parse_iso_utc
 from ..consensus import merge, slice_hour
 from ..physics import eei as eei_mod, heat as heat_mod, microclimate as mc
+from ..sources import ipma as ipma_mod
 from ..sources.openmeteo import models_identical
 
 DEFAULT_THR = {"rain_mmh": 0.5, "gust_kmh": 50.0, "cold_c": 5.0, "heat_c": 28.0}
@@ -110,6 +111,8 @@ def build_point(event, point, fetched: Dict, ensemble: Optional[Dict], ts_now: d
             "summary": {
                 "temp_min": min(h["temp"] for h in hrs), "temp_max": max(h["temp"] for h in hrs),
                 "rain_total": round(sum(h["rain"] for h in hrs), 1),
+                "rain_max_1h": round(max(h["rain"] for h in hrs), 1),
+                "rain_max_6h": round(max(sum(h["rain"] for h in hrs[k:k + 6]) for k in range(max(1, len(hrs) - 5))), 1),
                 "gust_max": max(h["gust"] for h in hrs), "wind_max": max(h["wind"] for h in hrs),
                 "eei_min": min(h["eei"] for h in hrs), "wbgt_max": max(h["wbgt"] for h in hrs),
                 "p_rain_max": max((r["p_rain"] for r in ens_rows if r["p_rain"] is not None), default=None),
@@ -129,9 +132,14 @@ def build_point(event, point, fetched: Dict, ensemble: Optional[Dict], ts_now: d
     }
 
 
-def build(event, per_point: Dict[int, dict], failed: list, ts_now: Optional[datetime.datetime] = None) -> dict:
+def build(event, per_point: Dict[int, dict], failed: list, ts_now: Optional[datetime.datetime] = None,
+          ipma_pending: Optional[list] = None, sources_failed: Optional[list] = None) -> dict:
     ts_now = ts_now or now_utc()
     pts = [per_point[p.id] for p in event.sorted_points if p.id in per_point]
+    ipma_pending = ipma_pending or []
+    for pt in pts:   # same district list for every point: the warning is issued per district, not per sector
+        for d in pt["days"]:
+            d["ipma_warnings"] = ipma_mod.for_date(ipma_pending, d["date"])
     return {
         "schema_version": SCHEMA_VERSION, "engine_version": ENGINE_VERSION, "product": "field",
         "run_id": uuid.uuid4().hex[:12], "event": event.slug, "event_name": event.name,
@@ -141,7 +149,9 @@ def build(event, per_point: Dict[int, dict], failed: list, ts_now: Optional[date
         "timestamp_utc": ts_now.isoformat(), "timestamp_local": to_local(ts_now, event.timezone).isoformat(),
         "degraded": False, "degraded_reason": None,
         "data_sources": ["ECMWF IFS 0.25° deterministic + 51-member ensemble (Open-Meteo)", "DWD ICON-EU (Open-Meteo)",
-                         "DSS microclimate — wind exposure, valley window"],
+                         "IPMA warnings — active and announced, per day", "DSS microclimate — wind exposure, valley window"],
+        "sources_failed": sources_failed or [],
+        "ipma_districts": event.ipma_districts, "ipma_warnings": ipma_pending,
         "points_failed": failed, "points_ok": len(pts), "points_expected": len(event.points),
         "points": pts,
     }

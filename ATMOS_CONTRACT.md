@@ -26,6 +26,9 @@ reading and `degraded_at_utc` the failed run. Never render degraded data as live
 | `sectors[].current.heat.wbgt_c` | °C | Always present; label only inside window |
 | `sectors[].consensus.status` | AGREE/UNCERTAIN/DIVERGENT/INVALID | |
 | `sectors[].forecast_3h` / `forecast_6h` | | temp, wind, gust, rain, code, eei, lightning_potential |
+| `summary.ipma_active` | bool | A warning is in force **now**. Says nothing about tomorrow |
+| `summary.ipma_upcoming[]` | | Yellow+ IPMA warnings announced but not yet in force (same row shape as `field.ipma_warnings`) |
+| `sources_failed[]` | str | Declared sources that did not answer this run (e.g. `AEMET HTTP 401`). **Empty warnings + a failed source = unknown, not all-clear** |
 
 ## field.json · 7-day planning view (DSS Field widget)
 
@@ -34,10 +37,14 @@ reading and `degraded_at_utc` the failed run. Never render degraded data as live
 | `event_date`, `window`, `thresholds` | From events/<slug>.yaml |
 | `points[].days[].is_event_day` | Highlight |
 | `points[].days[].astro` | civil_dawn, sunrise, sunset, civil_dusk (local HH:MM). Lights control = civil_dusk |
-| `points[].days[].summary` | temp_min/max, rain_total, gust_max, eei_min, wbgt_max, p_rain_max, p_gust_50_max, p_cold_max, p_heat_max, consensus_worst |
+| `points[].days[].summary` | temp_min/max, rain_total, rain_max_1h, rain_max_6h (worst hour / worst 6 h block inside the window), gust_max, eei_min, wbgt_max, p_rain_max, p_gust_50_max, p_cold_max, p_heat_max, consensus_worst |
 | `points[].days[].hours[]` | Hourly rows inside the window: temp, wind, gust, rain, hum, code, eei, eei_level, wbgt, consensus |
 | `hours[].ensemble` | `n_members`, `p_rain`, `p_gust_50`, `p_cold`, `p_heat` (member fractions 0–1), `temp_p10/p90`, `gust_p10/p90`, `rain_p90`. Absent if the ensemble call failed |
 | `points[].ensemble_available` | bool |
+| `ipma_districts` | From events/<slug>.yaml: districts the course crosses |
+| `ipma_warnings[]` | Yellow+ IPMA warnings for those districts, **active and announced**: `type`, `level` (yellow/orange/red), `rank`, `start_local`, `end_local` (local, as IPMA publishes), `active`, `text`, `areas[]`. Sea state excluded |
+| `points[].days[].ipma_warnings[]` | Subset covering that local date. A warning issued today for tomorrow is here from the first run after IPMA publishes it |
+| `sources_failed[]` | As in status.json |
 
 Probabilities are ECMWF ensemble member fractions, exposure-corrected for gusts.
 They are the honest replacement for the old "divergence index": spread measured

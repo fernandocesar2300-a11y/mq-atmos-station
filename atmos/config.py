@@ -40,6 +40,7 @@ class Event:
     calibration_path: Optional[str] = None  # aemet_corrections.json produced by ipma_calibration.py
     thresholds: dict = dataclasses.field(default_factory=dict)
     labels: dict = dataclasses.field(default_factory=dict)
+    ipma_districts: List[str] = dataclasses.field(default_factory=list)  # districts the course crosses; planning warnings. Default: union of point ipma_areas
 
     @property
     def sorted_points(self):
@@ -55,4 +56,5 @@ def load_event(path: str) -> Event:
         points=pts, window=win, event_date=(str(raw["event_date"]) if raw.get("event_date") else None), gpx_path=raw.get("gpx_path"),
         publish_dir=raw.get("publish_dir", "atmos"), aemet_area=raw.get("aemet_area"), calibration_path=raw.get("calibration_path"),
         thresholds=raw.get("thresholds", {}), labels=raw.get("labels", {}),
+        ipma_districts=list(raw.get("ipma_districts") or sorted({a for p in pts for a in (p.ipma_areas or [])})),
     )
