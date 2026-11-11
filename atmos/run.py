@@ -107,7 +107,7 @@ def run(event_path: str, products: list, publish: bool, cards: bool, out_root: s
         heartbeat.ping("/fail", reason)
         return 2
 
-    aemet_res = aemet.storm_alerts(event.aemet_area)
+    aemet_res = aemet.storm_alerts(event.aemet_area, event.aemet_zones)
     log.info("AEMET: %s", aemet_res[1])
     # Declared sources that did not answer. A silent failure reads as "no warning", which is a false all-clear.
     sources_failed = []

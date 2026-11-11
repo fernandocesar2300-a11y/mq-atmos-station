@@ -36,7 +36,8 @@ class Event:
     event_date: Optional[str] = None      # ISO date; field.json highlights it
     gpx_path: Optional[str] = None
     publish_dir: str = "atmos"            # remote directory under FTP root
-    aemet_area: Optional[str] = None      # AEMET CAP area code, e.g. "61"
+    aemet_area: Optional[str] = None      # AEMET CAP area (comunidad autónoma): 71 Galicia, 61 Andalucía, 77 C. Valenciana…
+    aemet_zones: List[str] = dataclasses.field(default_factory=list)  # AEMET zone geocodes to keep; empty = whole area
     calibration_path: Optional[str] = None  # aemet_corrections.json produced by ipma_calibration.py
     thresholds: dict = dataclasses.field(default_factory=dict)
     labels: dict = dataclasses.field(default_factory=dict)
@@ -54,7 +55,7 @@ def load_event(path: str) -> Event:
     return Event(
         slug=raw["slug"], name=raw["name"], timezone=raw.get("timezone", "Europe/Lisbon"),
         points=pts, window=win, event_date=(str(raw["event_date"]) if raw.get("event_date") else None), gpx_path=raw.get("gpx_path"),
-        publish_dir=raw.get("publish_dir", "atmos"), aemet_area=raw.get("aemet_area"), calibration_path=raw.get("calibration_path"),
+        publish_dir=raw.get("publish_dir", "atmos"), aemet_area=(str(raw["aemet_area"]) if raw.get("aemet_area") else None), aemet_zones=[str(z) for z in (raw.get("aemet_zones") or [])], calibration_path=raw.get("calibration_path"),
         thresholds=raw.get("thresholds", {}), labels=raw.get("labels", {}),
         ipma_districts=list(raw.get("ipma_districts") or sorted({a for p in pts for a in (p.ipma_areas or [])})),
     )

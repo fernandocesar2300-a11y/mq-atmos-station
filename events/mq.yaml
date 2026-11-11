@@ -5,7 +5,8 @@ event_date: 2027-06-19          # sábado, confirmado out 2026
 gpx_path: MQ_TRACK.gpx
 calibration_path: aemet_corrections.json
 publish_dir: ""                # FTP root = mountainquest.pt/atmos/
-aemet_area: "61"
+aemet_area: "71"               # Galicia. Era "61" = Andalucía (Huelva, Cádiz, Granada…): código errado desde o início
+aemet_zones: ["713603", "713202", "713203"]   # Miño de Pontevedra, Miño de Ourense, Sur de Ourense: as zonas que fazem fronteira com o Minho e Trás-os-Montes
 ipma_districts: [PTO, VRL]     # distritos que o traçado atravessa: avisos IPMA por dia em field.json
 window: { start_local: 5, end_local: 23 }   # saída 05:00 · meta 00:00 (Mutante 22:00)
 thresholds: { rain_mmh: 0.5, gust_kmh: 50, cold_c: 5, heat_c: 28 }

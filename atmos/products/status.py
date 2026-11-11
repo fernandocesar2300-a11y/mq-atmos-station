@@ -126,7 +126,7 @@ def build(event, per_point: Dict[int, dict], failed: list, aemet, ipma_active: b
         "degraded": False, "degraded_reason": None,
         "data_sources": [
             f"ECMWF IFS 0.25° (Open-Meteo {MODEL_IFS}) — primary", f"DWD ICON-EU (Open-Meteo {MODEL_ICON}) — secondary + storm diagnostics",
-            "IPMA point forecast — anchor", "IPMA warnings — institutional override", "AEMET CAP — NW Iberia override",
+            "IPMA point forecast — anchor", "IPMA warnings — institutional override", "AEMET CAP — Galicia border zones, storm override",
             "NASA POWER — irradiance fallback", "DSS microclimate — wind exposure, valley window",
         ],
         "consensus_engine": {"weights": {"IFS": 0.55, "ICON": 0.35, "IPMA": 0.10}, "models_identical_detected": identical},

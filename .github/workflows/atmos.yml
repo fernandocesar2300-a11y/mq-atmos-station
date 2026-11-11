@@ -13,9 +13,14 @@ on:
   workflow_dispatch:
     inputs:
       event: { description: "events/<name>.yaml", default: "events/mq.yaml" }
+# Only a push (new code) cancels the running loop. Scheduled and relay runs queue behind it and
+# take over when it ends, so its post-steps (output cache for the degraded fallback) are not lost.
 concurrency:
   group: atmos-${{ github.event.inputs.event || 'events/mq.yaml' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+permissions:
+  contents: read
+  actions: write          # relay: the job dispatches its own successor
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -48,3 +53,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: atmos-output, path: output, retention-days: 30 }
+      # Relay. GitHub's cron is best-effort: on 2026-11-11 the loop ended 07:37 and the 08:07 cron
+      # fired at 09:16, leaving 1h40 without a run in the middle of an orange warning. The loop now
+      # starts its successor itself; the cron stays only as a safety net. Skipped when cancelled
+      # (a push is already replacing this run).
+      - name: Relay — dispatch the next loop
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run atmos.yml --repo "${{ github.repository }}" --ref main -f event="${{ github.event.inputs.event || 'events/mq.yaml' }}"

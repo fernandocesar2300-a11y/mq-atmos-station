@@ -220,3 +220,37 @@ def test_ipma_pending_includes_announced_and_merges_areas(monkeypatch):
 def test_ipma_for_date_midnight_end_does_not_cover_next_day():
     row = {"start_local": "2026-11-11T09:00:00", "end_local": "2026-11-12T00:00:00"}
     assert ipma.for_date([row], "2026-11-11") == [row] and ipma.for_date([row], "2026-11-12") == []
+
+
+def _cap(event, severity, geocode, area, onset, expires, lang="es-ES"):
+    return (f'<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><info><language>{lang}</language><event>{event}</event>'
+            f'<severity>{severity}</severity><onset>{onset}</onset><expires>{expires}</expires>'
+            f'<area><areaDesc>{area}</areaDesc><geocode><valueName>AEMET-Meteoalerta zona</valueName><value>{geocode}</value></geocode></area></info></alert>').encode()
+
+
+def _tar(docs):
+    import io, tarfile
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as t:
+        for i, d in enumerate(docs):
+            ti = tarfile.TarInfo(f"Z_CAP_{i}.xml"); ti.size = len(d); t.addfile(ti, io.BytesIO(d))
+    return buf.getvalue()
+
+
+def test_aemet_reads_tar_and_filters_level_zone_and_validity():
+    """Regression 2026-11-11: `datos` is a tar of CAP files; ET.fromstring on it raised 'not well-formed'."""
+    from atmos.sources import aemet
+    now = datetime.datetime(2026, 11, 11, 9, 0, tzinfo=UTC)
+    on, off = "2026-11-11T06:00:00+01:00", "2026-11-11T23:59:59+01:00"
+    green = _cap("Aviso de tormentas de nivel verde", "Minor", "713203", "Sur de Ourense", on, off)
+    far = _cap("Aviso de tormentas de nivel naranja", "Severe", "711501", "Noroeste de A Coruña", on, off)
+    past = _cap("Aviso de tormentas de nivel naranja", "Severe", "713203", "Sur de Ourense", "2026-11-10T06:00:00+01:00", "2026-11-10T23:59:59+01:00")
+    rain = _cap("Aviso de lluvias de nivel naranja", "Severe", "713203", "Sur de Ourense", on, off)
+    zones = ["713603", "713202", "713203"]
+    assert aemet.parse(_tar([green, far, past, rain]), zones, now) == (False, "AEMET: no active storm warnings", None)
+    hit = _cap("Aviso de tormentas de nivel amarillo", "Moderate", "713203", "Sur de Ourense", on, off)
+    dup = _cap("Moderate thunderstorm warning", "Moderate", "713203", "Sur de Ourense", on, off, lang="en-GB")
+    ok, text, sev = aemet.parse(_tar([green, far, hit, dup]), zones, now)
+    assert ok and sev == "Moderate" and text.count("Sur de Ourense") == 1
+    assert aemet.parse(_tar([far]), None, now)[0] is True          # no zone filter = whole area
+    assert aemet.parse(hit, zones, now)[0] is True                 # bare XML still accepted
